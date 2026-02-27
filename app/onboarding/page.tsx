@@ -124,72 +124,19 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 1. Create organization
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ farm_name: farmName.trim() })
-        .select('id')
-        .single();
+      // Single atomic RPC call — creates org, membership, pens, and pantry
+      // in one transaction with SECURITY DEFINER (bypasses RLS chicken-and-egg).
+      const { error } = await supabase.rpc('complete_onboarding', {
+        p_farm_name: farmName.trim(),
+        p_pens: pens.map((p) => ({ name: p.name, capacity: p.capacity || '' })),
+        p_ingredients: ingredients.map((i) => ({ name: i.name })),
+      });
 
-      if (orgError || !org) {
+      if (error) {
         toast({
           variant: 'destructive',
           title: 'Setup Failed',
           description: 'Could not create your farm. Please try again.',
-        });
-        return;
-      }
-
-      const orgId = org.id;
-
-      // 2. Link user as tenant member
-      const { error: memberError } = await supabase
-        .from('tenant_members')
-        .insert({ user_id: user.id, organization_id: orgId });
-
-      if (memberError) {
-        toast({
-          variant: 'destructive',
-          title: 'Setup Failed',
-          description: 'Could not link your account. Please try again.',
-        });
-        return;
-      }
-
-      // 3. Batch insert pens
-      const penPayloads = pens.map((p) => ({
-        organization_id: orgId,
-        pen_name: p.name,
-        capacity: p.capacity ? parseInt(p.capacity, 10) : null,
-      }));
-
-      const { error: penError } = await supabase.from('pens').insert(penPayloads);
-
-      if (penError) {
-        toast({
-          variant: 'destructive',
-          title: 'Setup Failed',
-          description: 'Could not save your pens. Please try again.',
-        });
-        return;
-      }
-
-      // 4. Batch insert pantry ingredients
-      const ingredientPayloads = ingredients.map((i) => ({
-        organization_id: orgId,
-        ingredient_name: i.name,
-        unit: 'kg',
-      }));
-
-      const { error: pantryError } = await supabase
-        .from('pantry_ingredients')
-        .insert(ingredientPayloads);
-
-      if (pantryError) {
-        toast({
-          variant: 'destructive',
-          title: 'Setup Failed',
-          description: 'Could not save your pantry. Please try again.',
         });
         return;
       }
