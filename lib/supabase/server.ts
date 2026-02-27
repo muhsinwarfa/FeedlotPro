@@ -7,8 +7,8 @@ import { cookies } from 'next/headers';
 //   return createServerClient<Database>(...)
 // and run: npx supabase gen types typescript --project-id gqfjrkkwcgagcatnrizk > types/database.ts
 
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

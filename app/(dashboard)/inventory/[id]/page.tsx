@@ -36,9 +36,9 @@ function formatDateTime(iso: string): string {
 export default async function AnimalDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
@@ -61,7 +61,7 @@ export default async function AnimalDetailPage({
   const { data: rawAnimal } = await supabase
     .from('animals')
     .select('*, pens(pen_name)')
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .eq('organization_id', orgId)
     .single();
 

@@ -18,7 +18,7 @@ function formatDateTime(iso: string): string {
 }
 
 export default async function FeedingHistoryPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },

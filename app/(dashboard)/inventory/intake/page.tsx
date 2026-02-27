@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default async function AnimalIntakePage() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Resolve the authenticated user's organization (tenant isolation)
   const {
