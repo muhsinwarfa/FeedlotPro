@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { mapDbError } from '@/lib/errors';
+import { validateWeightEntry } from '@/lib/validators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,21 +41,9 @@ export function WeightForm({ animalId, animalStatus }: WeightFormProps) {
   }
 
   function validate(): boolean {
-    const w = parseFloat(newWeight);
-    if (!newWeight) {
-      setWeightError('Weight is required.');
-      return false;
-    }
-    if (isNaN(w) || w <= 0) {
-      setWeightError('Weight must be a positive number.');
-      return false;
-    }
-    if (!weighDate) {
-      setWeightError('Date is required.');
-      return false;
-    }
-    setWeightError('');
-    return true;
+    const error = validateWeightEntry(newWeight, weighDate);
+    setWeightError(error);
+    return error === '';
   }
 
   function handleSubmit(e: React.FormEvent) {

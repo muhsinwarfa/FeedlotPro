@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import type { IngredientInput } from './ingredient-form';
+import { formatDateTime } from '@/lib/formatters';
 
 type Pen = {
   id: string;
@@ -14,17 +15,6 @@ interface FeedingSummaryProps {
   onConfirm: () => void;
   onEdit: () => void;
   isPending: boolean;
-}
-
-function formatDateTime(d: Date): string {
-  return d.toLocaleString('en-KE', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export function FeedingSummary({

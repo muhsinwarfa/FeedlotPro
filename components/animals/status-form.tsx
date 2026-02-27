@@ -46,7 +46,7 @@ interface StatusFormProps {
 
 // ─── Transition map ──────────────────────────────────────────────────────────────
 
-const TRANSITIONS: Record<AnimalStatus, AnimalStatus[]> = {
+export const TRANSITIONS: Record<AnimalStatus, AnimalStatus[]> = {
   ACTIVE:     ['SICK', 'DEAD', 'DISPATCHED'],
   SICK:       ['ACTIVE', 'DEAD', 'DISPATCHED'],
   DEAD:       [],

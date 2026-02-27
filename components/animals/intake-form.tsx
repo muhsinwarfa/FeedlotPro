@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { mapDbError } from '@/lib/errors';
+import { validateIntakeForm } from '@/lib/validators';
 import type { Pen } from '@/types/database';
 
 // ─── shadcn/ui components (installed via: npx shadcn-ui@latest add button input label select form toast) ───
@@ -96,24 +97,7 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
 
   // ── Client-side validation ────────────────────────────────────────────────
   function validate(): boolean {
-    const errors: FieldErrors = {};
-
-    if (!form.tagId.trim()) errors.tagId = 'Tag ID is required.';
-    if (!form.breed.trim()) errors.breed = 'Breed is required.';
-    if (!form.penId) errors.penId = 'Please select a pen.';
-
-    const weight = parseFloat(form.intakeWeight);
-    if (!form.intakeWeight) {
-      errors.intakeWeight = 'Intake weight is required.';
-    } else if (isNaN(weight) || weight <= 0) {
-      errors.intakeWeight = 'Weight must be a positive number.';
-    }
-
-    if (!form.intakeDate) errors.intakeDate = 'Intake date is required.';
-
-    // Block submit if a duplicate-tag error is already showing
-    if (fieldErrors.tagId) errors.tagId = fieldErrors.tagId;
-
+    const errors = validateIntakeForm(form, fieldErrors.tagId);
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }

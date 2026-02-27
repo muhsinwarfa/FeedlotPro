@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PenSelector } from './pen-selector';
 import { IngredientForm, type IngredientInput } from './ingredient-form';
 import { FeedingSummary } from './feeding-summary';
+import { totalFeedKg } from '@/lib/formatters';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ export function FeedingFlow({ pens, ingredients, orgId }: FeedingFlowProps) {
   // ── Step 2: Ingredients submitted ───────────────────────────────────────
 
   function handleIngredientsSubmit(inputs: IngredientInput[]) {
-    const total = inputs.reduce((sum, i) => sum + (i.kgAmount ?? 0), 0);
+    const total = totalFeedKg(inputs);
     setIngredientInputs(inputs);
     setTotalKg(total);
     setTimestamp(new Date());

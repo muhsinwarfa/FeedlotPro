@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { weightGain, formatDate } from '@/lib/formatters';
 
 type AnimalRow = {
   id: string;
@@ -31,20 +32,6 @@ export function AnimalList({ animals }: { animals: AnimalRow[] }) {
   const filterOptions: StatusFilter[] = ['ALL', 'ACTIVE', 'SICK', 'DEAD', 'DISPATCHED'];
 
   const filtered = filter === 'ALL' ? animals : animals.filter((a) => a.status === filter);
-
-  function weightGain(animal: AnimalRow): string {
-    const current = animal.current_weight ?? animal.intake_weight;
-    const gain = current - animal.intake_weight;
-    return gain >= 0 ? `+${gain.toFixed(1)}` : gain.toFixed(1);
-  }
-
-  function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-KE', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
 
   return (
     <div className="space-y-4">
