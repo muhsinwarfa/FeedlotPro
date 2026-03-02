@@ -170,6 +170,30 @@ export function mapDbError(error: DbError): ToastPayload {
     };
   }
 
+  // ── V2.1 Remediation error codes ────────────────────────────────────────────
+
+  // BUS-008: Pen at capacity — raised by frontend validation before insert.
+  if (
+    error.message?.includes('BUS-008') ||
+    error.message?.includes('ERR_PEN_CAPACITY')
+  ) {
+    return {
+      title: 'BUS-008',
+      description: 'Pen is full. Choose a different pen or increase its capacity.',
+    };
+  }
+
+  // SYS-009: Report data query timeout — raised by frontend Promise.race() timeout.
+  if (
+    error.message?.includes('SYS-009') ||
+    error.message?.includes('ERR_REPORT_TIMEOUT')
+  ) {
+    return {
+      title: 'SYS-009',
+      description: 'Report generation timed out. Try a smaller date range.',
+    };
+  }
+
   return {
     title: 'Error',
     description: error.message ?? 'An unexpected error occurred.',

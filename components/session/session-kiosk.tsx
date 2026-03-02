@@ -146,11 +146,21 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
     });
   }
 
+  // ── Device fingerprint — stable per browser/tablet (P4 deviceId) ─────────
+  function getOrCreateDeviceId(): string {
+    const stored = localStorage.getItem('feedlotpro_device_id');
+    if (stored) return stored;
+    const id = crypto.randomUUID();
+    localStorage.setItem('feedlotpro_device_id', id);
+    return id;
+  }
+
   // ── Session creation ──────────────────────────────────────────────────────
   async function createAndStartSession() {
     if (!selectedMember) return;
 
     const expiresAt = new Date(Date.now() + sessionTtlHours * 60 * 60 * 1000).toISOString();
+    const deviceId = getOrCreateDeviceId();
 
     const { data: sessionData, error } = await supabase
       .from('sessions')
@@ -158,6 +168,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
         organization_id: organizationId,
         member_id: selectedMember.id,
         expires_at: expiresAt,
+        device_id: deviceId,
       })
       .select('id')
       .single();
@@ -174,6 +185,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
       role: selectedMember.role,
       avatarColor: selectedMember.avatar_color,
       expiresAt,
+      deviceId,
     });
 
     router.push('/');

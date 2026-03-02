@@ -49,6 +49,7 @@ const ROLE_LABELS: Record<string, string> = {
 const STATUS_STYLES: Record<string, string> = {
   ACTIVE: 'bg-emerald-100 text-emerald-800',
   LOCKED: 'bg-red-100 text-red-800',
+  REMOVED: 'bg-slate-100 text-slate-500',
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -80,6 +81,24 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
     router.refresh();
   }
 
+  // P11: Activity log helper — owner's member record is the performed_by actor
+  const ownerMemberId = members.find((m) => m.role === 'OWNER')?.id ?? null;
+
+  async function logActivity(
+    action: string,
+    targetId: string,
+    metadata?: Record<string, unknown>
+  ) {
+    await supabase.from('activity_log').insert({
+      organization_id: organizationId,
+      action,
+      target_entity: 'tenant_member',
+      target_id: targetId,
+      performed_by: ownerMemberId,
+      metadata: metadata ?? null,
+    } as never);
+  }
+
   // ── Edit role ─────────────────────────────────────────────────────────────
   function handleEditRole(member: Member) {
     setNewRole(member.role);
@@ -99,6 +118,11 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
         toast({ variant: 'destructive', ...mapDbError(error) });
         return;
       }
+
+      await logActivity('ROLE_CHANGED', editingMember.id, {
+        from_role: editingMember.role,
+        to_role: newRole,
+      });
 
       toast({ title: 'Role Updated', description: `${editingMember.display_name} is now ${ROLE_LABELS[newRole]}.` });
       setEditingMember(null);
@@ -135,6 +159,8 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
         return;
       }
 
+      await logActivity('PIN_RESET', resetPinMember.id);
+
       toast({ title: 'PIN Reset', description: `PIN updated for ${resetPinMember.display_name}.` });
       setResetPinMember(null);
       refreshMembers();
@@ -146,16 +172,18 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
     if (!removingMember) return;
 
     startTransition(async () => {
-      // Soft-delete: set status = REMOVED so audit trail is preserved
+      // Soft-delete: set status = REMOVED (DB CHECK constraint now includes REMOVED — V2.1 migration)
       const { error } = await supabase
         .from('tenant_members')
-        .update({ status: 'REMOVED' as never })
+        .update({ status: 'REMOVED' })
         .eq('id', removingMember.id);
 
       if (error) {
         toast({ variant: 'destructive', ...mapDbError(error) });
         return;
       }
+
+      await logActivity('MEMBER_REMOVED', removingMember.id, { display_name: removingMember.display_name });
 
       toast({ title: 'Member Removed', description: `${removingMember.display_name} has been removed from the team.` });
       setRemovingMember(null);
@@ -175,6 +203,8 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
         toast({ variant: 'destructive', ...mapDbError(error) });
         return;
       }
+
+      await logActivity('MEMBER_UNLOCKED', member.id);
 
       toast({ title: 'Account Unlocked', description: `${member.display_name} can now log in.` });
       refreshMembers();

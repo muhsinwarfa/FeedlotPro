@@ -6,6 +6,7 @@ import { useDropzone } from 'react-dropzone';
 import { createClient } from '@/lib/supabase/client';
 import { mapDbError } from '@/lib/errors';
 import { validateIntakeFormV2 } from '@/lib/validators';
+import { addToQueue } from '@/lib/offline/queue';
 import type { Pen, Batch } from '@/types/database';
 import { BatchSelector } from '@/components/animals/batch-selector';
 
@@ -136,6 +137,19 @@ export function IntakeForm({ organizationId, pens, batches }: IntakeFormProps) {
       },
       fieldErrors.tagId
     );
+
+    // BUS-008: Pen at capacity — validate before insert
+    if (form.penId) {
+      const selectedPen = pens.find((p) => p.id === form.penId);
+      if (
+        selectedPen &&
+        selectedPen.capacity != null &&
+        selectedPen.active_animal_count >= selectedPen.capacity
+      ) {
+        errors.penId = `BUS-008: ${selectedPen.pen_name} is full (${selectedPen.active_animal_count}/${selectedPen.capacity}). Choose another pen.`;
+      }
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -187,6 +201,25 @@ export function IntakeForm({ organizationId, pens, batches }: IntakeFormProps) {
       const { error } = await supabase.from('animals').insert(insertPayload as never);
 
       if (error) {
+        // P10 offline queue: queue the intake for later sync
+        if (!navigator.onLine || error.message?.includes('Failed to fetch')) {
+          await addToQueue({
+            table: 'animals',
+            method: 'INSERT',
+            payload: insertPayload,
+            localTimestamp: new Date().toISOString(),
+            memberId: null,
+          });
+          toast({ title: 'Saved offline', description: 'Animal intake queued and will sync when connected.' });
+          const savedTag = form.tagId.trim();
+          const savedBatchId = form.batchId;
+          setRegisteredTag(savedTag);
+          setForm(initialForm(savedBatchId));
+          setFieldErrors({});
+          setPhotoFile(null);
+          setPhotoPreview(null);
+          return;
+        }
         const { title, description } = mapDbError(error);
         toast({ variant: 'destructive', title, description });
         return;

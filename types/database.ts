@@ -134,7 +134,7 @@ export interface AuditLog {
 // ── V2 Types ──────────────────────────────────────────────────────────────────
 
 export type WorkerRole = 'OWNER' | 'MANAGER' | 'FARMHAND' | 'VET';
-export type MemberStatus = 'ACTIVE' | 'LOCKED';
+export type MemberStatus = 'ACTIVE' | 'LOCKED' | 'REMOVED';
 export type AnimalGender = 'BULL' | 'HEIFER' | 'STEER' | 'COW';
 export type AgeCategory = 'CALF' | 'WEANER' | 'GROWER' | 'FINISHER';
 
@@ -170,6 +170,7 @@ export interface Session {
   started_at: string;
   expires_at: string;
   ended_at: string | null;
+  device_id: string | null; // V2.1: stable browser-local tablet fingerprint
   created_at: string;
 }
 
@@ -285,8 +286,21 @@ export interface RationTemplate {
   ration_name: string;
   notes: string | null;
   is_active: boolean;
+  target_age_category: 'CALF' | 'WEANER' | 'GROWER' | 'FINISHER' | 'ALL' | null; // V2.1
   created_at: string;
   updated_at: string;
+}
+
+/** Activity log — system-wide audit trail for team management actions (V2.1) */
+export interface ActivityLog {
+  id: string;
+  organization_id: string;
+  action: string;         // e.g. 'ROLE_CHANGED', 'MEMBER_REMOVED', 'PIN_RESET', 'MEMBER_UNLOCKED'
+  target_entity: string;  // e.g. 'tenant_member'
+  target_id: string | null;
+  performed_by: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export type RationTemplateInsert = Omit<RationTemplate, 'id' | 'created_at' | 'updated_at'>;
@@ -363,6 +377,11 @@ export interface Database {
         Partial<SyncConflict>
       >;
       audit_logs: TableDef<AuditLog, Record<string, never>, Record<string, never>>;
+      activity_log: TableDef<
+        ActivityLog,
+        Omit<ActivityLog, 'id' | 'created_at'>,
+        Partial<ActivityLog>
+      >;
       // ── V2 Block 3 tables ──
       price_history: TableDef<PriceHistory, PriceHistoryInsert, Partial<PriceHistory>>;
       stock_transactions: TableDef<

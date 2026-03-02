@@ -34,6 +34,7 @@ export type RationWithIngredients = {
   ration_name: string;
   notes: string | null;
   is_active: boolean;
+  target_age_category: string | null; // V2.1: age group this ration targets
   ration_ingredients: Array<{
     id: string;
     ingredient_id: string;
@@ -52,7 +53,7 @@ interface RationFormDialogProps {
   onSuccess: (ration: RationWithIngredients) => void;
 }
 
-const EMPTY_HEADER: RationFormState = { rationName: '', notes: '' };
+const EMPTY_HEADER: RationFormState = { rationName: '', notes: '', targetAgeCategory: '' };
 const EMPTY_ROW: RationIngredientRowState = { ingredientId: '', kgPerAnimalPerDay: '' };
 
 export function RationFormDialog({
@@ -80,7 +81,7 @@ export function RationFormDialog({
   useEffect(() => {
     if (!open) return;
     if (mode === 'edit' && initialRation) {
-      setHeader({ rationName: initialRation.ration_name, notes: initialRation.notes ?? '' });
+      setHeader({ rationName: initialRation.ration_name, notes: initialRation.notes ?? '', targetAgeCategory: initialRation.target_age_category ?? '' });
       const seedRows = initialRation.ration_ingredients.map((ri) => ({
         ingredientId: ri.ingredient_id,
         kgPerAnimalPerDay: ri.kg_per_animal_per_day.toString(),
@@ -172,8 +173,9 @@ export function RationFormDialog({
             ration_name: header.rationName.trim(),
             notes: header.notes.trim() || null,
             is_active: true,
+            target_age_category: header.targetAgeCategory || null,
           } as never)
-          .select('id, ration_name, notes, is_active, created_at, updated_at')
+          .select('id, ration_name, notes, is_active, target_age_category, created_at, updated_at')
           .single();
 
         if (templateError) {
@@ -182,7 +184,7 @@ export function RationFormDialog({
           return;
         }
 
-        const template = templateData as { id: string; ration_name: string; notes: string | null; is_active: boolean; created_at: string; updated_at: string };
+        const template = templateData as { id: string; ration_name: string; notes: string | null; is_active: boolean; target_age_category: string | null; created_at: string; updated_at: string };
 
         // 2. Bulk insert ingredient rows
         const ingredientRows = rows.map((r) => ({
@@ -207,6 +209,7 @@ export function RationFormDialog({
           ration_name: template.ration_name,
           notes: template.notes,
           is_active: template.is_active,
+          target_age_category: template.target_age_category,
           ration_ingredients: rows.map((r, i) => ({
             id: `temp-${i}`,
             ingredient_id: r.ingredientId,
@@ -228,6 +231,7 @@ export function RationFormDialog({
           .update({
             ration_name: header.rationName.trim(),
             notes: header.notes.trim() || null,
+            target_age_category: header.targetAgeCategory || null,
             updated_at: new Date().toISOString(),
           } as never)
           .eq('id', initialRation.id);
@@ -272,6 +276,7 @@ export function RationFormDialog({
           ration_name: header.rationName.trim(),
           notes: header.notes.trim() || null,
           is_active: initialRation.is_active,
+          target_age_category: header.targetAgeCategory || null,
           ration_ingredients: rows.map((r, i) => ({
             id: `temp-edit-${i}`,
             ingredient_id: r.ingredientId,
@@ -326,6 +331,29 @@ export function RationFormDialog({
               onChange={(e) => handleHeaderChange('notes', e.target.value)}
               className="min-h-[44px]"
             />
+          </div>
+
+          {/* Target Age Category (P8C V2.1) */}
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium text-sm">
+              Target Age Category <span className="text-slate-400 font-normal">(optional)</span>
+            </Label>
+            <Select
+              value={header.targetAgeCategory ?? ''}
+              onValueChange={(v) => handleHeaderChange('targetAgeCategory', v === '_none' ? '' : v)}
+            >
+              <SelectTrigger className="min-h-[44px]">
+                <SelectValue placeholder="All age groups…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">All age groups</SelectItem>
+                <SelectItem value="CALF">Calf (0–6 mo)</SelectItem>
+                <SelectItem value="WEANER">Weaner (6–12 mo)</SelectItem>
+                <SelectItem value="GROWER">Grower (12–24 mo)</SelectItem>
+                <SelectItem value="FINISHER">Finisher (24 mo+)</SelectItem>
+                <SelectItem value="ALL">All (explicit)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Ingredient rows */}

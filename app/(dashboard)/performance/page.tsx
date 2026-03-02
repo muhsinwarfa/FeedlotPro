@@ -53,7 +53,7 @@ export default async function PerformancePage() {
   const orgId = membership.organization_id;
 
   // Parallel fetches
-  const [pensResult, activeAnimalsResult, dispatchResult, batchResult, orgResult] = await Promise.all([
+  const [pensResult, activeAnimalsResult, dispatchResult, batchResult, allBatchAnimalsResult, orgResult] = await Promise.all([
     // Pens with FCR
     supabase
       .from('pens')
@@ -61,10 +61,10 @@ export default async function PerformancePage() {
       .eq('organization_id', orgId)
       .eq('status', 'active'),
 
-    // Active animals with ADG for per-pen avg
+    // Active/sick animals with ADG + batch_id for per-pen and per-batch avg
     supabase
       .from('animals')
-      .select('pen_id, current_adg')
+      .select('pen_id, current_adg, batch_id')
       .eq('organization_id', orgId)
       .in('status', ['ACTIVE', 'SICK'])
       .not('current_adg', 'is', null),
@@ -85,6 +85,13 @@ export default async function PerformancePage() {
       .eq('organization_id', orgId)
       .order('arrival_date', { ascending: false }),
 
+    // All animals with a batch_id — used for total head count per batch (all statuses)
+    supabase
+      .from('animals')
+      .select('batch_id')
+      .eq('organization_id', orgId)
+      .not('batch_id', 'is', null),
+
     // Organization target_weight
     supabase
       .from('organizations')
@@ -94,9 +101,10 @@ export default async function PerformancePage() {
   ]);
 
   const pens = (pensResult.data ?? []) as Array<{ id: string; pen_name: string; active_animal_count: number; current_fcr: number | null }>;
-  const activeAnimals = (activeAnimalsResult.data ?? []) as Array<{ pen_id: string; current_adg: number | null }>;
+  const activeAnimals = (activeAnimalsResult.data ?? []) as Array<{ pen_id: string; current_adg: number | null; batch_id: string | null }>;
   const dispatchAnimals = (dispatchResult.data ?? []) as Array<{ id: string; tag_id: string; breed: string; pen_id: string | null; current_weight: number | null; current_adg: number | null; dispatch_ready_date: string | null }>;
   const batches = (batchResult.data ?? []) as Array<{ id: string; batch_code: string; source_supplier: string | null; arrival_date: string }>;
+  const allBatchAnimals = (allBatchAnimalsResult.data ?? []) as Array<{ batch_id: string }>;
   const targetWeight = (orgResult.data as { target_weight: number | null } | null)?.target_weight ?? null;
 
   // Build per-pen avg ADG map
@@ -133,14 +141,33 @@ export default async function PerformancePage() {
     dispatch_ready_date: a.dispatch_ready_date,
   }));
 
-  // Build batch rows (simple - no per-batch ADG query yet)
-  const batchRows = batches.map((b) => ({
-    batch_code: b.batch_code,
-    animal_count: 0, // TODO: join with animals count in Block 3
-    source_supplier: b.source_supplier,
-    avg_adg: null,
-    avg_days_on_feed: null,
-  }));
+  // Build batch rows with real animal_count and avg_adg (P7 — fixed in V2.1)
+  const adgByBatch: Record<string, number[]> = {};
+  for (const a of activeAnimals) {
+    if (!a.batch_id) continue;
+    if (!adgByBatch[a.batch_id]) adgByBatch[a.batch_id] = [];
+    if (a.current_adg != null) adgByBatch[a.batch_id].push(a.current_adg);
+  }
+
+  const countByBatch: Record<string, number> = {};
+  for (const a of allBatchAnimals) {
+    countByBatch[a.batch_id] = (countByBatch[a.batch_id] ?? 0) + 1;
+  }
+
+  const today = new Date();
+  const batchRows = batches.map((b) => {
+    const adgs = adgByBatch[b.id] ?? [];
+    const avg_adg = adgs.length > 0 ? adgs.reduce((s, v) => s + v, 0) / adgs.length : null;
+    const arrivalDate = new Date(b.arrival_date);
+    const avg_days_on_feed = Math.max(0, Math.floor((today.getTime() - arrivalDate.getTime()) / 86_400_000));
+    return {
+      batch_code: b.batch_code,
+      animal_count: countByBatch[b.id] ?? 0,
+      source_supplier: b.source_supplier,
+      avg_adg,
+      avg_days_on_feed,
+    };
+  });
 
   return (
     <div className="space-y-8">

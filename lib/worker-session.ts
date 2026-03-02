@@ -2,7 +2,7 @@
 // Used by: WorkerSessionContext, RBAC guards, unit tests.
 
 export type WorkerRole = 'OWNER' | 'MANAGER' | 'FARMHAND' | 'VET';
-export type MemberStatus = 'ACTIVE' | 'LOCKED';
+export type MemberStatus = 'ACTIVE' | 'LOCKED' | 'REMOVED';
 
 export interface WorkerSession {
   sessionId: string;
@@ -11,6 +11,7 @@ export interface WorkerSession {
   role: WorkerRole;
   avatarColor: string;
   expiresAt: string; // ISO 8601 timestamp
+  deviceId?: string; // stable browser-local tablet identifier (localStorage UUID)
 }
 
 // ── Role hierarchy (higher = more permissions) ──────────────────────────────

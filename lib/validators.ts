@@ -364,6 +364,7 @@ export function validatePurchaseForm(form: PurchaseFormState): PurchaseFieldErro
 export interface RationFormState {
   rationName: string;
   notes: string;
+  targetAgeCategory?: string; // V2.1: optional — 'CALF'|'WEANER'|'GROWER'|'FINISHER'|'ALL'|''
 }
 export interface RationFieldErrors {
   rationName?: string;

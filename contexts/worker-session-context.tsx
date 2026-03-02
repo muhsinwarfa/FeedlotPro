@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { WorkerSession } from '@/lib/worker-session';
 import { isSessionExpired, SESSION_STORAGE_KEY } from '@/lib/worker-session';
 
@@ -17,6 +18,7 @@ const WorkerSessionContext = createContext<WorkerSessionContextValue | null>(nul
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function WorkerSessionProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [activeSession, setActiveSession] = useState<WorkerSession | null>(null);
 
   // On mount: restore session from localStorage and validate TTL
@@ -35,6 +37,22 @@ export function WorkerSessionProvider({ children }: { children: React.ReactNode 
       localStorage.removeItem(SESSION_STORAGE_KEY);
     }
   }, []);
+
+  // SEC-002: Proactive TTL expiry check every 60s
+  // Detects session expiry mid-use rather than only on page navigation.
+  useEffect(() => {
+    if (!activeSession) return;
+
+    const interval = setInterval(() => {
+      if (isSessionExpired(activeSession)) {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        setActiveSession(null);
+        router.push('/session');
+      }
+    }, 60_000);
+
+    return () => clearInterval(interval);
+  }, [activeSession, router]);
 
   function setSession(session: WorkerSession) {
     setActiveSession(session);

@@ -1,11 +1,13 @@
 'use client';
 
-// ─── Flag Sick Form — P6 Health Workflow ──────────────────────────────────────
+// ─── Flag Sick Form — P6A Health Workflow ─────────────────────────────────────
 // Shown on the animal detail page when animal.status === 'ACTIVE'.
-// Transitions animal → SICK, creates a health_event, optionally uploads a photo.
+// Transitions animal → SICK, creates a health_event with photo + secondary symptoms.
+// V2.1: Added sick photo capture (dropzone) + secondary symptoms multi-select.
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDropzone } from 'react-dropzone';
 import { createClient } from '@/lib/supabase/client';
 import { validateFlagSickForm, type FlagSickFormState } from '@/lib/validators';
 import { mapDbError } from '@/lib/errors';
@@ -59,6 +61,13 @@ export function FlagSickForm({ animalId, organizationId, memberId, role, pens, o
   });
   const [errors, setErrors] = useState<Partial<FlagSickFormState>>({});
 
+  // V2.1: Secondary symptoms multi-select
+  const [secondarySymptoms, setSecondarySymptoms] = useState<string[]>([]);
+
+  // V2.1: Sick photo capture
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
   const supabase = createClient();
 
   // RBAC: only roles with FLAG_SICK can submit
@@ -71,6 +80,26 @@ export function FlagSickForm({ animalId, organizationId, memberId, role, pens, o
     setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
+  function toggleSecondarySymptom(symptom: string) {
+    setSecondarySymptoms((prev) =>
+      prev.includes(symptom) ? prev.filter((s) => s !== symptom) : [...prev, symptom]
+    );
+  }
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'] },
+    maxFiles: 1,
+    maxSize: 2 * 1024 * 1024,
+  });
+
   function handleSubmit() {
     const fieldErrors = validateFlagSickForm(form);
     if (Object.keys(fieldErrors).length > 0) {
@@ -81,7 +110,27 @@ export function FlagSickForm({ animalId, organizationId, memberId, role, pens, o
     startTransition(async () => {
       const now = new Date().toISOString();
 
-      // 1. Update animal status → SICK
+      // 1. Upload sick photo if provided (SYS-007: graceful failure)
+      let photoUrl: string | null = null;
+      if (photoFile) {
+        const ext = photoFile.name.split('.').pop() ?? 'jpg';
+        const path = `${organizationId}/sick/${animalId}-${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('animal-photos')
+          .upload(path, photoFile, { contentType: photoFile.type, upsert: false });
+        if (uploadError) {
+          toast({
+            variant: 'destructive',
+            title: 'SYS-007',
+            description: 'Photo upload failed. Sick flag saved without photo.',
+          });
+        } else {
+          const { data: urlData } = supabase.storage.from('animal-photos').getPublicUrl(path);
+          photoUrl = urlData?.publicUrl ?? null;
+        }
+      }
+
+      // 2. Update animal status → SICK
       const { error: animalError } = await supabase
         .from('animals')
         .update({
@@ -108,16 +157,16 @@ export function FlagSickForm({ animalId, organizationId, memberId, role, pens, o
         return;
       }
 
-      // 2. Insert health_event
+      // 3. Insert health_event with photo_url + secondary_symptoms
       const { error: eventError } = await supabase.from('health_events').insert({
         animal_id: animalId,
         organization_id: organizationId,
         event_type: 'FLAGGED_SICK',
         primary_symptom: form.primarySymptom,
-        secondary_symptoms: [],
+        secondary_symptoms: secondarySymptoms,
         severity: form.severity as 'MILD' | 'MODERATE' | 'SEVERE',
         notes: form.notes || null,
-        photo_url: null,
+        photo_url: photoUrl,
         performed_by: memberId,
       });
 
@@ -155,6 +204,28 @@ export function FlagSickForm({ animalId, organizationId, memberId, role, pens, o
         {errors.primarySymptom && <p className="text-xs text-red-600">{errors.primarySymptom}</p>}
       </div>
 
+      {/* Secondary Symptoms (multi-select checkboxes) */}
+      <div className="space-y-1.5">
+        <Label>Secondary Symptoms <span className="text-slate-400 font-normal">(optional)</span></Label>
+        <div className="grid grid-cols-2 gap-2">
+          {SYMPTOMS.map((s) => (
+            <label
+              key={s}
+              className={`flex items-center gap-2 cursor-pointer ${s === form.primarySymptom ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={secondarySymptoms.includes(s)}
+                onChange={() => toggleSecondarySymptom(s)}
+                disabled={s === form.primarySymptom}
+                className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="text-sm text-slate-700">{s}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       {/* Severity */}
       <div className="space-y-1">
         <Label htmlFor="severity">Severity *</Label>
@@ -189,9 +260,39 @@ export function FlagSickForm({ animalId, organizationId, memberId, role, pens, o
         {errors.sickPenId && <p className="text-xs text-red-600">{errors.sickPenId}</p>}
       </div>
 
+      {/* Sick Photo */}
+      <div className="space-y-1.5">
+        <Label>Condition Photo <span className="text-slate-400 font-normal">(optional, max 2 MB)</span></Label>
+        {photoPreview ? (
+          <div className="relative rounded-lg overflow-hidden border border-amber-200">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photoPreview} alt="Sick animal condition" className="w-full h-36 object-cover" />
+            <button
+              type="button"
+              onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+              className="absolute top-2 right-2 bg-white/80 hover:bg-white text-slate-600 rounded-full px-2 py-0.5 text-xs font-medium shadow"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div
+            {...getRootProps()}
+            className={`rounded-lg border-2 border-dashed p-4 text-center cursor-pointer transition-colors ${
+              isDragActive ? 'border-amber-400 bg-amber-100' : 'border-amber-200 hover:border-amber-300 bg-amber-50/50'
+            }`}
+          >
+            <input {...getInputProps()} />
+            <p className="text-xs text-slate-500">
+              {isDragActive ? 'Drop photo here…' : 'Tap or drag to upload condition photo (JPEG/PNG)'}
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Notes */}
       <div className="space-y-1">
-        <Label htmlFor="flagNotes">Notes (optional)</Label>
+        <Label htmlFor="flagNotes">Notes <span className="text-slate-400 font-normal">(optional)</span></Label>
         <Textarea
           id="flagNotes"
           placeholder="Any additional observations…"
