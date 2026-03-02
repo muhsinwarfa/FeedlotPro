@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { IntakeForm } from '@/components/animals/intake-form';
-import type { Pen } from '@/types/database';
+import type { Pen, Batch } from '@/types/database';
 
 export const metadata = {
   title: 'Animal Intake — FeedlotPro',
@@ -10,7 +10,6 @@ export const metadata = {
 export default async function AnimalIntakePage() {
   const supabase = await createClient();
 
-  // Resolve the authenticated user's organization (tenant isolation)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -23,22 +22,29 @@ export default async function AnimalIntakePage() {
     .eq('user_id', user.id)
     .single();
 
-  // Explicit cast: hand-crafted types; replace with generated DB types when CLI is linked
   const membership = rawMembership as { organization_id: string } | null;
-
   if (!membership) redirect('/login');
 
   const orgId = membership.organization_id;
 
-  // Fetch active pens for this organization — always scoped by organization_id
-  const { data: rawPens } = await supabase
-    .from('pens')
-    .select('id, pen_name, capacity, active_animal_count')
-    .eq('organization_id', orgId)
-    .eq('status', 'active')
-    .order('pen_name');
+  // Fetch active pens and today's batches in parallel
+  const [{ data: rawPens }, { data: rawBatches }] = await Promise.all([
+    supabase
+      .from('pens')
+      .select('id, pen_name, capacity, active_animal_count')
+      .eq('organization_id', orgId)
+      .eq('status', 'active')
+      .order('pen_name'),
+    supabase
+      .from('batches')
+      .select('id, batch_code, arrival_date, source_supplier')
+      .eq('organization_id', orgId)
+      .order('arrival_date', { ascending: false })
+      .limit(20),
+  ]);
 
   const pens = (rawPens ?? []) as Pick<Pen, 'id' | 'pen_name' | 'capacity' | 'active_animal_count'>[];
+  const batches = (rawBatches ?? []) as Pick<Batch, 'id' | 'batch_code' | 'arrival_date' | 'source_supplier'>[];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -60,7 +66,7 @@ export default async function AnimalIntakePage() {
       {/* Form Card */}
       <main className="mx-auto max-w-2xl px-4 py-8">
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <IntakeForm organizationId={orgId} pens={pens} />
+          <IntakeForm organizationId={orgId} pens={pens} batches={batches} />
         </div>
       </main>
     </div>

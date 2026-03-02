@@ -31,15 +31,22 @@ export default async function DashboardPage() {
 
   const [
     { count: activeAnimals },
+    { count: sickAnimals },
     { count: totalPens },
     { count: fedToday },
     { data: rawOrg },
+    { data: adgData },
   ] = await Promise.all([
     supabase
       .from('animals')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId)
       .eq('status', 'ACTIVE'),
+    supabase
+      .from('animals')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'SICK'),
     supabase
       .from('pens')
       .select('id', { count: 'exact', head: true })
@@ -55,9 +62,21 @@ export default async function DashboardPage() {
       .select('farm_name')
       .eq('id', orgId)
       .single(),
+    supabase
+      .from('animals')
+      .select('current_adg')
+      .eq('organization_id', orgId)
+      .eq('status', 'ACTIVE')
+      .not('current_adg', 'is', null),
   ]);
 
   const farmName = (rawOrg as { farm_name: string } | null)?.farm_name ?? 'Your Farm';
+
+  // Calculate avg ADG across all active animals with recorded weights
+  const adgValues = (adgData ?? []).map((a) => (a as { current_adg: number }).current_adg);
+  const avgAdg = adgValues.length > 0
+    ? adgValues.reduce((sum, v) => sum + v, 0) / adgValues.length
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -79,8 +98,10 @@ export default async function DashboardPage() {
       <div className="max-w-5xl mx-auto px-4 py-8">
         <DashboardOverview
           activeAnimals={activeAnimals ?? 0}
+          sickAnimals={sickAnimals ?? 0}
           totalPens={totalPens ?? 0}
           fedToday={fedToday ?? 0}
+          avgAdg={avgAdg}
         />
       </div>
     </div>

@@ -7,8 +7,9 @@ const ALL_STATUSES: AnimalStatus[] = ['ACTIVE', 'SICK', 'DEAD', 'DISPATCHED'];
 
 describe('TRANSITIONS state machine map', () => {
   describe('ACTIVE state', () => {
-    it('allows transition to SICK', () => {
-      expect(TRANSITIONS.ACTIVE).toContain('SICK');
+    // V2 Block 2: ACTIVE→SICK is handled by FlagSickForm, not StatusForm
+    it('does NOT have SICK in ACTIVE transitions (handled by FlagSickForm)', () => {
+      expect(TRANSITIONS.ACTIVE).not.toContain('SICK');
     });
 
     it('allows transition to DEAD', () => {
@@ -23,14 +24,15 @@ describe('TRANSITIONS state machine map', () => {
       expect(TRANSITIONS.ACTIVE).not.toContain('ACTIVE');
     });
 
-    it('has exactly 3 valid transitions', () => {
-      expect(TRANSITIONS.ACTIVE).toHaveLength(3);
+    it('has exactly 2 valid transitions', () => {
+      expect(TRANSITIONS.ACTIVE).toHaveLength(2);
     });
   });
 
   describe('SICK state', () => {
-    it('allows transition to ACTIVE (recovery)', () => {
-      expect(TRANSITIONS.SICK).toContain('ACTIVE');
+    // V2 Block 2: SICK→ACTIVE (recovery) is handled by HealthOutcomeForm, not StatusForm
+    it('does NOT have ACTIVE in SICK transitions (handled by HealthOutcomeForm)', () => {
+      expect(TRANSITIONS.SICK).not.toContain('ACTIVE');
     });
 
     it('allows transition to DEAD', () => {
@@ -45,8 +47,8 @@ describe('TRANSITIONS state machine map', () => {
       expect(TRANSITIONS.SICK).not.toContain('SICK');
     });
 
-    it('has exactly 3 valid transitions', () => {
-      expect(TRANSITIONS.SICK).toHaveLength(3);
+    it('has exactly 2 valid transitions', () => {
+      expect(TRANSITIONS.SICK).toHaveLength(2);
     });
   });
 

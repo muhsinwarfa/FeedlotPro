@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { mapDbError } from '@/lib/errors';
 import { validateWeightEntry } from '@/lib/validators';
+import { addToQueue } from '@/lib/offline/queue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,6 +61,20 @@ export function WeightForm({ animalId, animalStatus }: WeightFormProps) {
       const { error } = await supabase.from('weight_records').insert(payload as never);
 
       if (error) {
+        // Offline fallback: queue the operation when network is unavailable
+        if (!navigator.onLine || error.message?.includes('Failed to fetch')) {
+          await addToQueue({
+            table: 'weight_records',
+            method: 'INSERT',
+            payload,
+            localTimestamp: new Date().toISOString(),
+            memberId: null,
+          });
+          toast({ title: 'Saved offline', description: 'Weight will sync when connected.' });
+          setNewWeight('');
+          setWeighDate(today());
+          return;
+        }
         const { title, description } = mapDbError(error);
         toast({ variant: 'destructive', title, description });
         return;

@@ -26,25 +26,44 @@ export default async function FeedingPage() {
 
   const orgId = membership.organization_id;
 
-  // Fetch pens and pantry ingredients in parallel
-  const [{ data: rawPens }, { data: rawIngredients }] = await Promise.all([
-    supabase
-      .from('pens')
-      .select('id, pen_name, status, active_animal_count, capacity')
-      .eq('organization_id', orgId)
-      .order('pen_name'),
-    supabase
-      .from('pantry_ingredients')
-      .select('id, ingredient_name')
-      .eq('organization_id', orgId)
-      .order('ingredient_name'),
-  ]);
+  // Fetch pens, pantry ingredients, and active ration templates in parallel
+  const [{ data: rawPens }, { data: rawIngredients }, { data: rawRations }] =
+    await Promise.all([
+      supabase
+        .from('pens')
+        .select('id, pen_name, status, active_animal_count, capacity')
+        .eq('organization_id', orgId)
+        .order('pen_name'),
+      supabase
+        .from('pantry_ingredients')
+        .select('id, ingredient_name')
+        .eq('organization_id', orgId)
+        .order('ingredient_name'),
+      supabase
+        .from('ration_templates')
+        .select('id, ration_name, ration_ingredients(ingredient_id, kg_per_animal_per_day)')
+        .eq('organization_id', orgId)
+        .eq('is_active', true)
+        .order('ration_name'),
+    ]);
 
-  type Pen = { id: string; pen_name: string; status: string; active_animal_count: number; capacity: number | null };
+  type Pen = {
+    id: string;
+    pen_name: string;
+    status: string;
+    active_animal_count: number;
+    capacity: number | null;
+  };
   type Ingredient = { id: string; ingredient_name: string };
+  type RationSummary = {
+    id: string;
+    ration_name: string;
+    ration_ingredients: Array<{ ingredient_id: string; kg_per_animal_per_day: number }>;
+  };
 
   const pens = (rawPens ?? []) as Pen[];
   const ingredients = (rawIngredients ?? []) as Ingredient[];
+  const rations = (rawRations ?? []) as unknown as RationSummary[];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -83,7 +102,12 @@ export default async function FeedingPage() {
           </div>
         ) : (
           <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <FeedingFlow pens={pens} ingredients={ingredients} orgId={orgId} />
+            <FeedingFlow
+              pens={pens}
+              ingredients={ingredients}
+              orgId={orgId}
+              rations={rations}
+            />
           </div>
         )}
       </main>

@@ -6,13 +6,6 @@ import { createClient } from '@/lib/supabase/client';
 import { mapDbError } from '@/lib/errors';
 import { Button } from '@/components/ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -45,10 +38,13 @@ interface StatusFormProps {
 }
 
 // ─── Transition map ──────────────────────────────────────────────────────────────
+// V2 Block 2: ACTIVE→SICK is now handled by FlagSickForm.
+// SICK→ACTIVE (recovery) and SICK→DEAD/DISPATCHED are handled by HealthOutcomeForm.
+// StatusForm only handles terminal transitions that are NOT covered by the health workflow.
 
 export const TRANSITIONS: Record<AnimalStatus, AnimalStatus[]> = {
-  ACTIVE:     ['SICK', 'DEAD', 'DISPATCHED'],
-  SICK:       ['ACTIVE', 'DEAD', 'DISPATCHED'],
+  ACTIVE:     ['DEAD', 'DISPATCHED'],
+  SICK:       ['DEAD', 'DISPATCHED'],
   DEAD:       [],
   DISPATCHED: [],
 };
@@ -68,7 +64,6 @@ export function StatusForm({ animal, pens }: StatusFormProps) {
   const [isPending, startTransition] = useTransition();
 
   const [confirmStatus, setConfirmStatus] = useState<AnimalStatus | null>(null);
-  const [sickPenId, setSickPenId] = useState<string>('');
 
   const supabase = createClient();
   const currentStatus = animal.status as AnimalStatus;
@@ -84,34 +79,16 @@ export function StatusForm({ animal, pens }: StatusFormProps) {
   }
 
   function handleTransitionClick(targetStatus: AnimalStatus) {
-    if (targetStatus === 'SICK') {
-      // Need pen selection — show inline UI, not dialog
-      setConfirmStatus(targetStatus);
-    } else {
-      setConfirmStatus(targetStatus);
-    }
+    setConfirmStatus(targetStatus);
   }
 
   function handleConfirm() {
     if (!confirmStatus) return;
 
-    if (confirmStatus === 'SICK' && !sickPenId) {
-      toast({ variant: 'destructive', title: 'Select a Pen', description: 'Please select a pen for the sick animal.' });
-      return;
-    }
-
     startTransition(async () => {
-      const updatePayload: Record<string, unknown> = {
-        status: confirmStatus,
-      };
-
-      if (confirmStatus === 'SICK' && sickPenId) {
-        updatePayload.pen_id = sickPenId;
-      }
-
       const { error } = await supabase
         .from('animals')
-        .update(updatePayload as never)
+        .update({ status: confirmStatus } as never)
         .eq('id', animal.id);
 
       if (error) {
@@ -127,7 +104,6 @@ export function StatusForm({ animal, pens }: StatusFormProps) {
       });
 
       setConfirmStatus(null);
-      setSickPenId('');
       router.refresh();
     });
   }
@@ -154,53 +130,6 @@ export function StatusForm({ animal, pens }: StatusFormProps) {
           </Button>
         ))}
       </div>
-
-      {/* SICK confirmation inline — need pen selection */}
-      {confirmStatus === 'SICK' && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
-          <p className="text-sm font-medium text-amber-800">Moving to sick pen</p>
-          <div className="space-y-1.5">
-            <label className="text-sm text-slate-700 font-medium">Select Sick Pen</label>
-            <Select value={sickPenId} onValueChange={setSickPenId}>
-              <SelectTrigger className="min-h-[44px] bg-white">
-                <SelectValue placeholder="Choose a pen…" />
-              </SelectTrigger>
-              <SelectContent>
-                {pens
-                  .filter((p) => p.id !== animal.pen_id)
-                  .map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.pen_name}
-                      {p.capacity != null && (
-                        <span className="ml-2 text-slate-400 text-xs">
-                          ({p.active_animal_count}/{p.capacity})
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              onClick={handleConfirm}
-              disabled={isPending || !sickPenId}
-              className="min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white font-semibold"
-            >
-              {isPending ? 'Updating…' : 'Confirm — Move to Sick Pen'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => { setConfirmStatus(null); setSickPenId(''); }}
-              className="min-h-[44px] border-slate-300 text-slate-600"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* DEAD / DISPATCHED confirmation dialog */}
       <Dialog

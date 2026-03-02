@@ -3,6 +3,9 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { WeightForm } from '@/components/animals/weight-form';
 import { StatusForm } from '@/components/animals/status-form';
+import { FlagSickForm } from '@/components/health/flag-sick-form';
+import { HealthOutcomeForm } from '@/components/health/health-outcome-form';
+import type { WorkerRole } from '@/lib/worker-session';
 
 export const metadata = {
   title: 'Animal Detail — FeedlotPro',
@@ -48,11 +51,11 @@ export default async function AnimalDetailPage({
 
   const { data: rawMembership } = await supabase
     .from('tenant_members')
-    .select('organization_id')
+    .select('id, organization_id, role')
     .eq('user_id', user.id)
     .single();
 
-  const membership = rawMembership as { organization_id: string } | null;
+  const membership = rawMembership as { id: string; organization_id: string; role: WorkerRole } | null;
   if (!membership) redirect('/onboarding');
 
   const orgId = membership.organization_id;
@@ -79,6 +82,9 @@ export default async function AnimalDetailPage({
     dispatch_date: string | null;
     pen_id: string;
     organization_id: string;
+    current_adg: number | null;
+    dispatch_ready: boolean;
+    sick_since: string | null;
     pens: { pen_name: string } | { pen_name: string }[] | null;
   };
 
@@ -104,6 +110,26 @@ export default async function AnimalDetailPage({
 
   type PenOption = { id: string; pen_name: string; capacity: number | null; active_animal_count: number };
   const pens = (rawPens ?? []) as PenOption[];
+
+  // Fetch health event history
+  const { data: rawHealthEvents } = await supabase
+    .from('health_events')
+    .select('id, event_type, primary_symptom, severity, notes, created_at')
+    .eq('animal_id', animal.id)
+    .order('created_at', { ascending: false });
+
+  type HealthEventRow = { id: string; event_type: string; primary_symptom: string | null; severity: string | null; notes: string | null; created_at: string };
+  const healthEvents = (rawHealthEvents ?? []) as HealthEventRow[];
+
+  // Fetch treatment records
+  const { data: rawTreatments } = await supabase
+    .from('treatment_records')
+    .select('id, medication_name, dosage, administration_route, treatment_cost, treated_at')
+    .eq('animal_id', animal.id)
+    .order('treated_at', { ascending: false });
+
+  type TreatmentRow = { id: string; medication_name: string; dosage: string; administration_route: string; treatment_cost: number | null; treated_at: string };
+  const treatments = (rawTreatments ?? []) as TreatmentRow[];
 
   const isLocked = animal.status === 'DEAD' || animal.status === 'DISPATCHED';
   const currentWeight = animal.current_weight ?? animal.intake_weight;
@@ -151,19 +177,21 @@ export default async function AnimalDetailPage({
         )}
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
-            { label: 'Intake Weight', value: `${animal.intake_weight.toFixed(1)} kg` },
-            { label: 'Current Weight', value: `${currentWeight.toFixed(1)} kg` },
+            { label: 'Intake Weight', value: `${animal.intake_weight.toFixed(1)} kg`, highlight: false },
+            { label: 'Current Weight', value: `${currentWeight.toFixed(1)} kg`, highlight: false },
             { label: 'Total Gain', value: `${gain >= 0 ? '+' : ''}${gain.toFixed(1)} kg`, highlight: true },
-            { label: 'Intake Date', value: formatDate(animal.intake_date) },
+            { label: 'Intake Date', value: formatDate(animal.intake_date), highlight: false },
+            { label: 'Avg Daily Gain', value: animal.current_adg != null ? `+${animal.current_adg.toFixed(3)} kg/d` : 'N/A', highlight: false },
+            { label: 'Dispatch Ready', value: animal.dispatch_ready ? 'Yes ✓' : 'Not yet', highlight: animal.dispatch_ready },
           ].map((item) => (
             <div key={item.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs text-slate-500 font-medium">{item.label}</p>
               <p className={`mt-1 text-lg font-bold font-mono ${
                 item.highlight
-                  ? gain >= 0 ? 'text-emerald-700' : 'text-red-600'
-                  : 'text-slate-900'
+                  ? 'text-emerald-700'
+                  : gain >= 0 && item.label === 'Total Gain' ? 'text-emerald-700' : 'text-slate-900'
               }`}>
                 {item.value}
               </p>
@@ -208,11 +236,93 @@ export default async function AnimalDetailPage({
           </div>
         )}
 
-        {/* Status change */}
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900 mb-4">Manage Status</h2>
-          <StatusForm animal={animal} pens={pens} />
-        </div>
+        {/* Flag as Sick (ACTIVE animals only) */}
+        {animal.status === 'ACTIVE' && (
+          <FlagSickForm
+            animalId={animal.id}
+            organizationId={animal.organization_id}
+            memberId={membership.id}
+            role={membership.role}
+            pens={pens.map((p) => ({ id: p.id, pen_name: p.pen_name }))}
+          />
+        )}
+
+        {/* Health Outcome (SICK animals only) */}
+        {animal.status === 'SICK' && (
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Resolve Health Status</h2>
+            <HealthOutcomeForm
+              animalId={animal.id}
+              organizationId={animal.organization_id}
+              memberId={membership.id}
+              role={membership.role}
+            />
+          </div>
+        )}
+
+        {/* Status change (terminal transitions only — DEAD / DISPATCHED) */}
+        {!isLocked && (
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Manage Status</h2>
+            <StatusForm animal={animal} pens={pens} />
+          </div>
+        )}
+
+        {/* Health event history */}
+        {healthEvents.length > 0 && (
+          <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-slate-900">Health History</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Date</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Event</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {healthEvents.map((ev) => (
+                  <tr key={ev.id}>
+                    <td className="px-5 py-3 text-slate-500 whitespace-nowrap">{formatDate(ev.created_at)}</td>
+                    <td className="px-5 py-3 font-medium text-slate-900">{ev.event_type.replace(/_/g, ' ')}</td>
+                    <td className="px-5 py-3 text-slate-600">{[ev.primary_symptom, ev.severity, ev.notes].filter(Boolean).join(' · ') || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Treatment records */}
+        {treatments.length > 0 && (
+          <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-slate-900">Treatment Records</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Date</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Medication</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Route</th>
+                  <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Cost (KES)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {treatments.map((tr) => (
+                  <tr key={tr.id}>
+                    <td className="px-5 py-3 text-slate-500 whitespace-nowrap">{formatDate(tr.treated_at)}</td>
+                    <td className="px-5 py-3 font-medium text-slate-900">{tr.medication_name} <span className="text-slate-500 font-normal">{tr.dosage}</span></td>
+                    <td className="px-5 py-3 text-slate-600">{tr.administration_route.replace(/_/g, ' ')}</td>
+                    <td className="px-5 py-3 text-right font-mono">{tr.treatment_cost != null ? tr.treatment_cost.toFixed(2) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

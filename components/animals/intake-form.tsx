@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDropzone } from 'react-dropzone';
 import { createClient } from '@/lib/supabase/client';
 import { mapDbError } from '@/lib/errors';
-import { validateIntakeForm } from '@/lib/validators';
-import type { Pen } from '@/types/database';
+import { validateIntakeFormV2 } from '@/lib/validators';
+import type { Pen, Batch } from '@/types/database';
+import { BatchSelector } from '@/components/animals/batch-selector';
 
-// ─── shadcn/ui components (installed via: npx shadcn-ui@latest add button input label select form toast) ───
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 interface IntakeFormProps {
   organizationId: string;
   pens: Pick<Pen, 'id' | 'pen_name' | 'capacity' | 'active_animal_count'>[];
+  batches: Pick<Batch, 'id' | 'batch_code' | 'arrival_date' | 'source_supplier'>[];
 }
 
 interface FormState {
@@ -33,15 +35,14 @@ interface FormState {
   penId: string;
   intakeWeight: string;
   intakeDate: string;
+  // V2 fields
+  gender: string;
+  ageCategory: string;
+  batchId: string;
+  sourceSupplier: string;
 }
 
-interface FieldErrors {
-  tagId?: string;
-  breed?: string;
-  penId?: string;
-  intakeWeight?: string;
-  intakeDate?: string;
-}
+type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,33 +50,57 @@ function today(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────────
-
-export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
-  const router = useRouter();
-  const { toast } = useToast();
-  const [isPending, startTransition] = useTransition();
-
-  const [form, setForm] = useState<FormState>({
+function initialForm(preservedBatchId = ''): FormState {
+  return {
     tagId: '',
     breed: '',
     penId: '',
     intakeWeight: '',
     intakeDate: today(),
-  });
+    gender: '',
+    ageCategory: '',
+    batchId: preservedBatchId,
+    sourceSupplier: '',
+  };
+}
 
+// ─── Component ─────────────────────────────────────────────────────────────────
+
+export function IntakeForm({ organizationId, pens, batches }: IntakeFormProps) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+
+  const [form, setForm] = useState<FormState>(initialForm());
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [registeredTag, setRegisteredTag] = useState<string | null>(null);
 
   const supabase = createClient();
 
   // ── Field change handler ──────────────────────────────────────────────────
   function handleChange(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
-    // Clear field error on change
     if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   }
+
+  // ── Photo upload ──────────────────────────────────────────────────────────
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'] },
+    maxFiles: 1,
+    maxSize: 2 * 1024 * 1024,
+  });
 
   // ── Duplicate tag check (on blur) ─────────────────────────────────────────
   async function checkTagUniqueness(tagId: string) {
@@ -95,9 +120,22 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
     }
   }
 
-  // ── Client-side validation ────────────────────────────────────────────────
+  // ── Validation ────────────────────────────────────────────────────────────
   function validate(): boolean {
-    const errors = validateIntakeForm(form, fieldErrors.tagId);
+    const errors = validateIntakeFormV2(
+      {
+        tagId: form.tagId,
+        breed: form.breed,
+        penId: form.penId,
+        intakeWeight: form.intakeWeight,
+        intakeDate: form.intakeDate,
+        gender: form.gender,
+        ageCategory: form.ageCategory,
+        batchId: form.batchId,
+        sourceSupplier: form.sourceSupplier,
+      },
+      fieldErrors.tagId
+    );
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -108,7 +146,29 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
     if (!validate()) return;
 
     startTransition(async () => {
-      // Explicit cast: hand-crafted types; replace with generated DB types when CLI is linked
+      let photoUrl: string | null = null;
+
+      if (photoFile) {
+        const ext = photoFile.name.split('.').pop() ?? 'jpg';
+        const path = `${organizationId}/${form.tagId.trim()}-${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('animal-photos')
+          .upload(path, photoFile, { contentType: photoFile.type, upsert: false });
+
+        if (uploadError) {
+          toast({
+            variant: 'destructive',
+            title: 'SYS-007',
+            description: 'Photo upload failed. Animal saved without photo.',
+          });
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('animal-photos')
+            .getPublicUrl(path);
+          photoUrl = urlData?.publicUrl ?? null;
+        }
+      }
+
       const insertPayload: Record<string, unknown> = {
         organization_id: organizationId,
         pen_id: form.penId,
@@ -117,7 +177,13 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
         intake_weight: parseFloat(form.intakeWeight),
         status: 'ACTIVE',
         intake_date: new Date(form.intakeDate).toISOString(),
+        gender: form.gender || null,
+        age_category: form.ageCategory || null,
+        batch_id: form.batchId || null,
+        source_supplier: form.sourceSupplier.trim() || null,
+        photo_url: photoUrl,
       };
+
       const { error } = await supabase.from('animals').insert(insertPayload as never);
 
       if (error) {
@@ -126,16 +192,62 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
         return;
       }
 
-      toast({
-        title: 'Animal Registered',
-        description: `Tag ${form.tagId.trim()} has been added to your inventory.`,
-      });
-      router.push('/inventory');
-      router.refresh();
+      const savedTag = form.tagId.trim();
+      const savedBatchId = form.batchId;
+
+      setRegisteredTag(savedTag);
+      setForm(initialForm(savedBatchId));
+      setFieldErrors({});
+      setPhotoFile(null);
+      setPhotoPreview(null);
     });
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Register Another? ─────────────────────────────────────────────────────
+  function handleRegisterAnother() {
+    setRegisteredTag(null);
+  }
+
+  function handleDone() {
+    router.push('/inventory');
+    router.refresh();
+  }
+
+  // ── Success state ─────────────────────────────────────────────────────────
+  if (registeredTag) {
+    return (
+      <div className="space-y-6 text-center py-4">
+        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+          <svg className="w-8 h-8 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Animal Registered</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Tag <span className="font-mono font-semibold">{registeredTag}</span> has been added to inventory.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            onClick={handleRegisterAnother}
+            className="flex-1 min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white font-semibold"
+          >
+            Register Another
+          </Button>
+          <Button
+            onClick={handleDone}
+            variant="outline"
+            className="flex-1 min-h-[44px] border-slate-300 text-slate-700"
+          >
+            Done
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Form ──────────────────────────────────────────────────────────────────
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
 
@@ -155,9 +267,7 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
           disabled={isPending}
           autoComplete="off"
         />
-        {fieldErrors.tagId && (
-          <p className="text-xs text-red-600">{fieldErrors.tagId}</p>
-        )}
+        {fieldErrors.tagId && <p className="text-xs text-red-600">{fieldErrors.tagId}</p>}
       </div>
 
       {/* Breed */}
@@ -174,9 +284,39 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
           className={`min-h-[44px] ${fieldErrors.breed ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
           disabled={isPending}
         />
-        {fieldErrors.breed && (
-          <p className="text-xs text-red-600">{fieldErrors.breed}</p>
-        )}
+        {fieldErrors.breed && <p className="text-xs text-red-600">{fieldErrors.breed}</p>}
+      </div>
+
+      {/* Gender + Age Category */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="gender" className="text-slate-700 font-medium">Gender</Label>
+          <Select value={form.gender} onValueChange={(v) => handleChange('gender', v)} disabled={isPending}>
+            <SelectTrigger id="gender" className="min-h-[44px]">
+              <SelectValue placeholder="Select…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="BULL">Bull</SelectItem>
+              <SelectItem value="HEIFER">Heifer</SelectItem>
+              <SelectItem value="STEER">Steer</SelectItem>
+              <SelectItem value="COW">Cow</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="ageCategory" className="text-slate-700 font-medium">Age Category</Label>
+          <Select value={form.ageCategory} onValueChange={(v) => handleChange('ageCategory', v)} disabled={isPending}>
+            <SelectTrigger id="ageCategory" className="min-h-[44px]">
+              <SelectValue placeholder="Select…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="CALF">Calf (0–6 mo)</SelectItem>
+              <SelectItem value="WEANER">Weaner (6–12 mo)</SelectItem>
+              <SelectItem value="GROWER">Grower (12–24 mo)</SelectItem>
+              <SelectItem value="FINISHER">Finisher (24 mo+)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Pen */}
@@ -184,11 +324,7 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
         <Label htmlFor="penId" className="text-slate-700 font-medium">
           Pen <span className="text-red-500">*</span>
         </Label>
-        <Select
-          value={form.penId}
-          onValueChange={(value) => handleChange('penId', value)}
-          disabled={isPending}
-        >
+        <Select value={form.penId} onValueChange={(value) => handleChange('penId', value)} disabled={isPending}>
           <SelectTrigger
             id="penId"
             className={`min-h-[44px] ${fieldErrors.penId ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
@@ -197,26 +333,20 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
           </SelectTrigger>
           <SelectContent>
             {pens.length === 0 ? (
-              <SelectItem value="_none" disabled>
-                No active pens found
-              </SelectItem>
+              <SelectItem value="_none" disabled>No active pens found</SelectItem>
             ) : (
               pens.map((pen) => (
                 <SelectItem key={pen.id} value={pen.id}>
                   {pen.pen_name}
                   {pen.capacity != null && (
-                    <span className="ml-2 text-slate-400 text-xs">
-                      ({pen.active_animal_count}/{pen.capacity})
-                    </span>
+                    <span className="ml-2 text-slate-400 text-xs">({pen.active_animal_count}/{pen.capacity})</span>
                   )}
                 </SelectItem>
               ))
             )}
           </SelectContent>
         </Select>
-        {fieldErrors.penId && (
-          <p className="text-xs text-red-600">{fieldErrors.penId}</p>
-        )}
+        {fieldErrors.penId && <p className="text-xs text-red-600">{fieldErrors.penId}</p>}
       </div>
 
       {/* Intake Weight */}
@@ -232,13 +362,10 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
           placeholder="0.0"
           value={form.intakeWeight}
           onChange={(e) => handleChange('intakeWeight', e.target.value)}
-          // Roboto Mono for numeric data fields per design system
           className={`min-h-[44px] font-mono ${fieldErrors.intakeWeight ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
           disabled={isPending}
         />
-        {fieldErrors.intakeWeight && (
-          <p className="text-xs text-red-600">{fieldErrors.intakeWeight}</p>
-        )}
+        {fieldErrors.intakeWeight && <p className="text-xs text-red-600">{fieldErrors.intakeWeight}</p>}
       </div>
 
       {/* Intake Date */}
@@ -254,8 +381,68 @@ export function IntakeForm({ organizationId, pens }: IntakeFormProps) {
           className={`min-h-[44px] ${fieldErrors.intakeDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
           disabled={isPending}
         />
-        {fieldErrors.intakeDate && (
-          <p className="text-xs text-red-600">{fieldErrors.intakeDate}</p>
+        {fieldErrors.intakeDate && <p className="text-xs text-red-600">{fieldErrors.intakeDate}</p>}
+      </div>
+
+      {/* Batch */}
+      <div className="space-y-1.5">
+        <Label className="text-slate-700 font-medium">
+          Batch <span className="text-slate-400 font-normal">(optional)</span>
+        </Label>
+        <BatchSelector
+          organizationId={organizationId}
+          batches={batches}
+          value={form.batchId}
+          onChange={(batchId) => handleChange('batchId', batchId)}
+          disabled={isPending}
+        />
+      </div>
+
+      {/* Source Supplier */}
+      <div className="space-y-1.5">
+        <Label htmlFor="sourceSupplier" className="text-slate-700 font-medium">
+          Source / Supplier <span className="text-slate-400 font-normal">(optional)</span>
+        </Label>
+        <Input
+          id="sourceSupplier"
+          type="text"
+          placeholder="e.g. Narok Market"
+          value={form.sourceSupplier}
+          onChange={(e) => handleChange('sourceSupplier', e.target.value)}
+          className="min-h-[44px]"
+          disabled={isPending}
+        />
+      </div>
+
+      {/* Photo */}
+      <div className="space-y-1.5">
+        <Label className="text-slate-700 font-medium">
+          Animal Photo <span className="text-slate-400 font-normal">(optional, max 2 MB)</span>
+        </Label>
+        {photoPreview ? (
+          <div className="relative rounded-lg overflow-hidden border border-slate-200">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photoPreview} alt="Animal photo preview" className="w-full h-48 object-cover" />
+            <button
+              type="button"
+              onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+              className="absolute top-2 right-2 bg-white/80 hover:bg-white text-slate-600 rounded-full px-2 py-0.5 text-xs font-medium shadow"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div
+            {...getRootProps()}
+            className={`rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-colors ${
+              isDragActive ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
+            }`}
+          >
+            <input {...getInputProps()} />
+            <p className="text-sm text-slate-500">
+              {isDragActive ? 'Drop photo here…' : 'Tap or drag to upload photo (JPEG/PNG)'}
+            </p>
+          </div>
         )}
       </div>
 

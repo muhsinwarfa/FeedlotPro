@@ -31,6 +31,8 @@ export default function OnboardingPage() {
   // Step 1 state
   const [farmName, setFarmName] = useState('');
   const [farmNameError, setFarmNameError] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerNameError, setOwnerNameError] = useState('');
 
   // Step 2 state
   const [penInput, setPenInput] = useState('');
@@ -48,11 +50,20 @@ export default function OnboardingPage() {
   // ── Step 1 — Farm Name ────────────────────────────────────────────────────
 
   function handleStep1Next() {
+    let hasError = false;
     if (!farmName.trim() || farmName.trim().length < 2) {
       setFarmNameError('Farm name must be at least 2 characters.');
-      return;
+      hasError = true;
+    } else {
+      setFarmNameError('');
     }
-    setFarmNameError('');
+    if (!ownerName.trim() || ownerName.trim().length < 2) {
+      setOwnerNameError('Your name must be at least 2 characters.');
+      hasError = true;
+    } else {
+      setOwnerNameError('');
+    }
+    if (hasError) return;
     setStep(2);
   }
 
@@ -130,6 +141,7 @@ export default function OnboardingPage() {
         p_farm_name: farmName.trim(),
         p_pens: pens.map((p) => ({ name: p.name, capacity: p.capacity || '' })),
         p_ingredients: ingredients.map((i) => ({ name: i.name })),
+        p_display_name: ownerName.trim(),
       });
 
       if (error) {
@@ -225,6 +237,24 @@ export default function OnboardingPage() {
                 {farmNameError && (
                   <p className="text-xs text-red-600">{farmNameError}</p>
                 )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ownerName" className="text-slate-700 font-medium">
+                  Your Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="ownerName"
+                  type="text"
+                  placeholder="e.g. John Kamau"
+                  value={ownerName}
+                  onChange={(e) => { setOwnerName(e.target.value); setOwnerNameError(''); }}
+                  className={`min-h-[44px] ${ownerNameError ? 'border-red-500' : ''}`}
+                />
+                {ownerNameError && (
+                  <p className="text-xs text-red-600">{ownerNameError}</p>
+                )}
+                <p className="text-xs text-slate-400">Shown on the worker kiosk screen.</p>
               </div>
 
               <Button

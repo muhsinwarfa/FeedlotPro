@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { mapDbError } from '@/lib/errors';
+import { addToQueue } from '@/lib/offline/queue';
 import { useToast } from '@/hooks/use-toast';
 import { PenSelector } from './pen-selector';
 import { IngredientForm, type IngredientInput } from './ingredient-form';
@@ -25,17 +26,27 @@ type Ingredient = {
   ingredient_name: string;
 };
 
+type RationSummary = {
+  id: string;
+  ration_name: string;
+  ration_ingredients: Array<{
+    ingredient_id: string;
+    kg_per_animal_per_day: number;
+  }>;
+};
+
 interface FeedingFlowProps {
   pens: Pen[];
   ingredients: Ingredient[];
   orgId: string;
+  rations?: RationSummary[];
 }
 
 type Step = 'SELECT_PEN' | 'ENTER_INGREDIENTS' | 'REVIEW' | 'SAVED';
 
 // ─── Component ──────────────────────────────────────────────────────────────────
 
-export function FeedingFlow({ pens, ingredients, orgId }: FeedingFlowProps) {
+export function FeedingFlow({ pens, ingredients, orgId, rations = [] }: FeedingFlowProps) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
@@ -44,6 +55,10 @@ export function FeedingFlow({ pens, ingredients, orgId }: FeedingFlowProps) {
   const [ingredientInputs, setIngredientInputs] = useState<IngredientInput[]>([]);
   const [totalKg, setTotalKg] = useState(0);
   const [timestamp, setTimestamp] = useState<Date>(new Date());
+
+  // Ration selector state — incrementing rationKey forces IngredientForm remount
+  const [selectedRationId, setSelectedRationId] = useState('');
+  const [rationKey, setRationKey] = useState(0);
 
   const supabase = createClient();
 
@@ -71,7 +86,33 @@ export function FeedingFlow({ pens, ingredients, orgId }: FeedingFlowProps) {
     }
 
     setSelectedPen(pen);
+    setSelectedRationId('');
     setStep('ENTER_INGREDIENTS');
+  }
+
+  // ── Ration template applied ───────────────────────────────────────────────
+
+  function applyRation(rationId: string) {
+    if (!rationId || !selectedPen) return;
+    const ration = rations.find((r) => r.id === rationId);
+    if (!ration) return;
+
+    // Scale kg per ingredient by the pen's head count
+    const headCount = selectedPen.active_animal_count;
+    const prefilledInputs: IngredientInput[] = ration.ration_ingredients.flatMap((ri) => {
+      const ing = ingredients.find((i) => i.id === ri.ingredient_id);
+      if (!ing) return [];
+      return [{
+        ingredientId: ri.ingredient_id,
+        ingredientName: ing.ingredient_name,
+        kgAmount: parseFloat((ri.kg_per_animal_per_day * headCount).toFixed(1)),
+      }];
+    });
+
+    setSelectedRationId(rationId);
+    setIngredientInputs(prefilledInputs);
+    // Incrementing rationKey remounts IngredientForm so it re-reads initialValues
+    setRationKey((k) => k + 1);
   }
 
   // ── Step 2: Ingredients submitted ───────────────────────────────────────
@@ -103,12 +144,50 @@ export function FeedingFlow({ pens, ingredients, orgId }: FeedingFlowProps) {
         .single();
 
       if (recordError || !record) {
+        // Offline fallback: queue feeding record + details when network is unavailable
+        if (!navigator.onLine || recordError?.message?.includes('Failed to fetch')) {
+          const localId = crypto.randomUUID();
+          await addToQueue({
+            table: 'feeding_records',
+            method: 'INSERT',
+            payload: {
+              id: localId,
+              organization_id: orgId,
+              pen_id: selectedPen.id,
+              feeding_timestamp: timestamp.toISOString(),
+              total_kg_fed: totalKg,
+            },
+            localTimestamp: new Date().toISOString(),
+            memberId: null,
+          });
+          // Queue details
+          const details = ingredientInputs
+            .filter((i) => i.kgAmount != null && i.kgAmount > 0)
+            .map((i) => ({
+              feeding_record_id: localId,
+              ingredient_id: i.ingredientId,
+              kg_amount: i.kgAmount!,
+            }));
+          for (const detail of details) {
+            await addToQueue({
+              table: 'feeding_details',
+              method: 'INSERT',
+              payload: detail,
+              localTimestamp: new Date().toISOString(),
+              memberId: null,
+            });
+          }
+          toast({ title: 'Feeding saved offline', description: 'Will sync when connected.' });
+          setStep('SAVED');
+          return;
+        }
         const { title, description } = mapDbError(recordError ?? { message: 'Unknown error' });
         toast({ variant: 'destructive', title, description });
         return;
       }
 
       // Insert feeding details (only non-zero ingredients)
+      // trg_feeding_cost_on_detail_insert fires per row: snapshots price, creates CONSUMPTION, rolls up total_cost
       const details = ingredientInputs
         .filter((i) => i.kgAmount != null && i.kgAmount > 0)
         .map((i) => ({
@@ -140,6 +219,7 @@ export function FeedingFlow({ pens, ingredients, orgId }: FeedingFlowProps) {
     setSelectedPen(null);
     setIngredientInputs([]);
     setTotalKg(0);
+    setSelectedRationId('');
   }
 
   // ── Step indicator ───────────────────────────────────────────────────────
@@ -209,12 +289,42 @@ export function FeedingFlow({ pens, ingredients, orgId }: FeedingFlowProps) {
       )}
 
       {step === 'ENTER_INGREDIENTS' && (
-        <IngredientForm
-          ingredients={ingredients}
-          initialValues={ingredientInputs}
-          onSubmit={handleIngredientsSubmit}
-          onBack={() => setStep('SELECT_PEN')}
-        />
+        <div className="space-y-4">
+          {/* Ration template selector (only shown when rations exist) */}
+          {rations.length > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+              <span className="text-sm font-medium text-emerald-800 flex-shrink-0">
+                Use ration:
+              </span>
+              <select
+                value={selectedRationId}
+                onChange={(e) => applyRation(e.target.value)}
+                className="flex-1 min-h-[36px] rounded-md border border-emerald-300 bg-white text-sm text-slate-900 px-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="">— Select a ration template —</option>
+                {rations.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.ration_name}
+                  </option>
+                ))}
+              </select>
+              {selectedRationId && (
+                <span className="text-xs text-emerald-700 font-medium flex-shrink-0">
+                  Pre-filled ✓
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Ingredient form — key changes on ration apply to force remount with new initialValues */}
+          <IngredientForm
+            key={rationKey}
+            ingredients={ingredients}
+            initialValues={ingredientInputs}
+            onSubmit={handleIngredientsSubmit}
+            onBack={() => setStep('SELECT_PEN')}
+          />
+        </div>
       )}
 
       {step === 'REVIEW' && selectedPen && (
