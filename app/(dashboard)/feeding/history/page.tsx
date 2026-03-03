@@ -30,9 +30,9 @@ export default async function FeedingHistoryPage() {
     .from('tenant_members')
     .select('organization_id')
     .eq('user_id', user.id)
-    .single();
+    .limit(1);
 
-  const membership = rawMembership as { organization_id: string } | null;
+  const membership = (rawMembership?.[0] ?? null) as { organization_id: string } | null;
   if (!membership) redirect('/onboarding');
 
   const orgId = membership.organization_id;

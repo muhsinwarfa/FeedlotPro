@@ -40,9 +40,9 @@ export default async function HealthPage() {
     .from('tenant_members')
     .select('id, organization_id, role')
     .eq('user_id', user.id)
-    .single();
-  if (!rawMembership) redirect('/onboarding');
-  const membership = rawMembership as { id: string; organization_id: string; role: string };
+    .limit(1);
+  if (!rawMembership?.[0]) redirect('/onboarding');
+  const membership = (rawMembership[0]) as { id: string; organization_id: string; role: string };
 
   // Fetch SICK animals with pen info and latest health event
   const { data: rawAnimals } = await supabase

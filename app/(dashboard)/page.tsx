@@ -15,11 +15,13 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login');
 
-  const { data: membership } = await supabase
+  const { data: membershipRows } = await supabase
     .from('tenant_members')
     .select('organization_id')
     .eq('user_id', user.id)
-    .single();
+    .limit(1);
+
+  const membership = membershipRows?.[0] ?? null;
 
   if (!membership) redirect('/onboarding');
 

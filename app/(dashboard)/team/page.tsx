@@ -19,10 +19,10 @@ export default async function TeamPage() {
     .from('tenant_members')
     .select('organization_id, role')
     .eq('user_id', user.id)
-    .single();
+    .limit(1);
 
   type Membership = { organization_id: string; role: string };
-  const membership = rawMembership as Membership | null;
+  const membership = (rawMembership?.[0] ?? null) as Membership | null;
 
   if (!membership) redirect('/onboarding');
 

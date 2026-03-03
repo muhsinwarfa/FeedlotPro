@@ -39,9 +39,9 @@ export default async function PerformancePage() {
     .from('tenant_members')
     .select('organization_id, role')
     .eq('user_id', user.id)
-    .single();
-  if (!rawMembership) redirect('/onboarding');
-  const membership = rawMembership as { organization_id: string; role: string };
+    .limit(1);
+  if (!rawMembership?.[0]) redirect('/onboarding');
+  const membership = (rawMembership[0]) as { organization_id: string; role: string };
 
   const role = membership.role as import('@/lib/worker-session').WorkerRole;
 

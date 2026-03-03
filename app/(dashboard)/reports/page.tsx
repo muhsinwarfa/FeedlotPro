@@ -41,10 +41,10 @@ export default async function ReportsPage({
     .from('tenant_members')
     .select('organization_id, role')
     .eq('user_id', user.id)
-    .single();
+    .limit(1);
 
-  if (!rawMembership) redirect('/onboarding');
-  const membership = rawMembership as { organization_id: string; role: string };
+  if (!rawMembership?.[0]) redirect('/onboarding');
+  const membership = (rawMembership[0]) as { organization_id: string; role: string };
   const role = membership.role as WorkerRole;
 
   if (!checkPermission(role, ACTION.MANAGE_REPORTS)) redirect('/');

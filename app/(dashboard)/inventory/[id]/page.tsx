@@ -53,9 +53,9 @@ export default async function AnimalDetailPage({
     .from('tenant_members')
     .select('id, organization_id, role')
     .eq('user_id', user.id)
-    .single();
+    .limit(1);
 
-  const membership = rawMembership as { id: string; organization_id: string; role: WorkerRole } | null;
+  const membership = (rawMembership?.[0] ?? null) as { id: string; organization_id: string; role: WorkerRole } | null;
   if (!membership) redirect('/onboarding');
 
   const orgId = membership.organization_id;
