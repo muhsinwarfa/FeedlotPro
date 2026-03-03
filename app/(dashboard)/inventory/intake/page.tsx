@@ -16,13 +16,14 @@ export default async function AnimalIntakePage() {
 
   if (!user) redirect('/login');
 
-  const { data: rawMembership } = await supabase
+  const { data: membershipRows } = await supabase
     .from('tenant_members')
     .select('organization_id')
     .eq('user_id', user.id)
-    .single();
+    .order('created_at', { ascending: false })
+    .limit(1);
 
-  const membership = rawMembership as { organization_id: string } | null;
+  const membership = (membershipRows?.[0] ?? null) as { organization_id: string } | null;
   if (!membership) redirect('/login');
 
   const orgId = membership.organization_id;

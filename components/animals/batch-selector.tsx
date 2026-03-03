@@ -58,9 +58,7 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
     }
   }
 
-  function handleCreateBatch(e: React.FormEvent) {
-    e.preventDefault();
-
+  function handleCreateBatch() {
     const errors = validateBatchForm(newBatch);
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
@@ -120,9 +118,9 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
         </SelectContent>
       </Select>
 
-      {/* Inline batch creation form */}
+      {/* Inline batch creation — rendered as <div> to avoid nesting inside the outer IntakeForm <form> */}
       {showCreateForm && (
-        <form onSubmit={handleCreateBatch} noValidate className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
           <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">New Batch</p>
 
           <div className="space-y-1">
@@ -178,7 +176,8 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
 
           <div className="flex gap-2">
             <Button
-              type="submit"
+              type="button"
+              onClick={handleCreateBatch}
               disabled={isPending}
               className="flex-1 min-h-[44px] text-sm bg-amber-500 hover:bg-amber-600 text-white font-semibold"
             >
@@ -193,7 +192,7 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
               Cancel
             </Button>
           </div>
-        </form>
+        </div>
       )}
     </div>
   );
