@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import bcrypt from 'bcryptjs';
 import { Lock } from 'lucide-react';
@@ -42,7 +42,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
   const router = useRouter();
   const { toast } = useToast();
   const { setSession } = useWorkerSession();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   // Step 1: member selection; Step 2: PIN entry; Step 3: PIN setup (first-time)
   const [step, setStep] = useState<'select' | 'pin' | 'pin-setup'>('select');
@@ -68,10 +68,10 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
   }
 
   // ── PIN verification ──────────────────────────────────────────────────────
-  async function handlePinComplete(enteredPin: string) {
+  function handlePinComplete(enteredPin: string) {
     if (!selectedMember) return;
-    setIsLoading(true);
-    try {
+
+    startTransition(async () => {
       const isMatch = await bcrypt.compare(enteredPin, selectedMember.pin_hash ?? '');
 
       if (!isMatch) {
@@ -109,9 +109,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
         .eq('id', selectedMember.id);
 
       await createAndStartSession();
-    } finally {
-      setIsLoading(false);
-    }
+    });
   }
 
   // ── PIN setup (first-time) ────────────────────────────────────────────────
@@ -119,7 +117,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
     setSetupPin(pin);
   }
 
-  async function handlePinSetupStep2(confirmedPin: string) {
+  function handlePinSetupStep2(confirmedPin: string) {
     if (!selectedMember) return;
 
     if (confirmedPin !== setupPin) {
@@ -132,8 +130,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
       return;
     }
 
-    setIsLoading(true);
-    try {
+    startTransition(async () => {
       const hash = await bcrypt.hash(confirmedPin, 10);
 
       const { error } = await supabase
@@ -147,9 +144,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
       }
 
       await createAndStartSession();
-    } finally {
-      setIsLoading(false);
-    }
+    });
   }
 
   // ── Device fingerprint — stable per browser/tablet (P4 deviceId) ─────────
@@ -278,7 +273,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
           onComplete={handlePinComplete}
           isLocked={selectedMember.status === 'LOCKED' || attemptCount >= 3}
           attemptCount={attemptCount}
-          isPending={isLoading}
+          isPending={isPending}
         />
       </div>
     );
@@ -311,7 +306,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
 
         <PinPad
           onComplete={setupPin ? handlePinSetupStep2 : handlePinSetupStep1}
-          isPending={isLoading}
+          isPending={isPending}
         />
       </div>
     );
