@@ -1,44 +1,21 @@
 -- ============================================================
--- Migration: Deduplicate tenant_members + make onboarding RPC idempotent
+-- Migration: Make complete_onboarding RPC idempotent
 --
 -- Root cause: migrations 20260326/20260327 broke the dashboard
--- layout by enabling RLS on tenant_members, causing an infinite
--- redirect to /onboarding. Users re-submitted the onboarding form
--- repeatedly (thinking it failed), which called complete_onboarding
--- multiple times. Each call created a new organization + a new
--- tenant_members row for the same user_id. The dashboard layout
--- used .single() which returns null for >1 rows — identical to
--- "no rows" — so the redirect loop continued even after RLS was
--- disabled in 20260328.
+-- layout, trapping users in an onboarding loop. They re-submitted
+-- the onboarding form each time, creating duplicate organizations
+-- and tenant_members rows for the same user_id. The dashboard
+-- layout used .single() which returns null for >1 rows.
+--
+-- The layout fix (limit(1) + array access) is deployed via code.
+-- This migration prevents future duplicates by making the RPC
+-- return early if the calling user already has a membership.
+--
+-- Note: existing duplicate rows are intentionally left in place
+-- because they are referenced by health_events and other tables
+-- via FK constraints. The layout fix handles them correctly.
 -- ============================================================
 
--- Step 1: Remove duplicate tenant_members rows for the same user_id,
--- keeping only the most recently created one per user.
-DELETE FROM public.tenant_members
-WHERE id IN (
-  SELECT id FROM (
-    SELECT id,
-           ROW_NUMBER() OVER (
-             PARTITION BY user_id
-             ORDER BY created_at DESC NULLS LAST
-           ) AS rn
-    FROM public.tenant_members
-    WHERE user_id IS NOT NULL
-  ) ranked
-  WHERE rn > 1
-);
-
--- Step 2: Remove orphaned organizations that have no tenant_members
--- (leftover from the duplicate onboarding submissions).
-DELETE FROM public.organizations
-WHERE id NOT IN (
-  SELECT DISTINCT organization_id FROM public.tenant_members
-);
-
--- Step 3: Make the complete_onboarding RPC idempotent — if the
--- calling user already has a tenant_members row, return their
--- existing organization_id immediately rather than creating a
--- duplicate.
 CREATE OR REPLACE FUNCTION public.complete_onboarding(
   p_farm_name    TEXT,
   p_pens         JSONB,
@@ -66,11 +43,12 @@ BEGIN
     RAISE EXCEPTION 'Farm name is required';
   END IF;
 
-  -- Idempotency: if user already has an organization, return it immediately.
-  -- This prevents duplicate orgs when onboarding is submitted more than once.
+  -- Idempotency guard: if user already has an organization, return it.
+  -- Prevents duplicate orgs when onboarding is accidentally submitted twice.
   SELECT organization_id INTO v_org_id
   FROM public.tenant_members
   WHERE user_id = v_user_id
+  ORDER BY created_at DESC
   LIMIT 1;
 
   IF v_org_id IS NOT NULL THEN
