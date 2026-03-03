@@ -19,11 +19,15 @@ export default async function DashboardLayout({
 
   if (!user) redirect('/login');
 
-  const { data: rawMembership } = await supabase
+  // Use limit(1) + array access instead of .single() so that duplicate
+  // tenant_member rows (possible if onboarding was submitted more than once)
+  // don't silently return null and trigger a redirect loop.
+  const { data: membershipRows } = await supabase
     .from('tenant_members')
     .select('organization_id, role, display_name, avatar_color, status')
     .eq('user_id', user.id)
-    .single();
+    .order('created_at', { ascending: false })
+    .limit(1);
 
   type MembershipRow = {
     organization_id: string;
@@ -33,7 +37,7 @@ export default async function DashboardLayout({
     status: string;
   };
 
-  const membership = rawMembership as MembershipRow | null;
+  const membership = (membershipRows?.[0] ?? null) as MembershipRow | null;
   if (!membership) redirect('/onboarding');
 
   // Fetch sick animal count for sidebar badge
