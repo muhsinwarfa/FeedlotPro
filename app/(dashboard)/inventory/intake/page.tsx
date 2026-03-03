@@ -63,11 +63,9 @@ export default async function AnimalIntakePage() {
         </div>
       </header>
 
-      {/* Form Card */}
-      <main className="mx-auto max-w-2xl px-4 py-8">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <IntakeForm organizationId={orgId} pens={pens} batches={batches} />
-        </div>
+      {/* Form — sectioned cards inside */}
+      <main className="mx-auto max-w-2xl px-4 py-6">
+        <IntakeForm organizationId={orgId} pens={pens} batches={batches} />
       </main>
     </div>
   );

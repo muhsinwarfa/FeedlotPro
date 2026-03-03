@@ -102,6 +102,7 @@ export default async function DashboardPage() {
           totalPens={totalPens ?? 0}
           fedToday={fedToday ?? 0}
           avgAdg={avgAdg}
+          farmName={farmName}
         />
       </div>
     </div>

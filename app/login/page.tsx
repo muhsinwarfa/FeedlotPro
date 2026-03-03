@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 type AuthMode = 'signin' | 'signup' | 'magic_link';
 
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [magicSent, setMagicSent] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
@@ -189,16 +191,16 @@ export default function LoginPage() {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
-            {/* Mode tabs */}
-            <div className="flex rounded-lg overflow-hidden border border-slate-200 mb-6">
+            {/* Mode tabs — segmented control */}
+            <div className="bg-slate-100 rounded-xl p-1 flex mb-6">
               {(['signin', 'signup'] as const).map((m) => (
                 <button
                   key={m}
-                  onClick={() => { setMode(m); setError(null); }}
-                  className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                  onClick={() => { setMode(m); setError(null); setShowPassword(false); }}
+                  className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
                     mode === m
-                      ? 'bg-emerald-950 text-white'
-                      : 'text-slate-600 hover:bg-slate-50'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {m === 'signin' ? 'Sign In' : 'Sign Up'}
@@ -231,24 +233,36 @@ export default function LoginPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); clearError(); }}
-                    className="min-h-[44px]"
-                    disabled={isPending}
-                    autoComplete="current-password"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); clearError(); }}
+                      className="min-h-[44px] pr-10"
+                      disabled={isPending}
+                      autoComplete="current-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <Button
                   type="submit"
                   disabled={isPending}
                   className="w-full min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white font-semibold"
                 >
-                  {isPending ? 'Signing in…' : 'Sign In'}
+                  {isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin inline" />Signing in…</>
+                  ) : 'Sign In'}
                 </Button>
 
                 <div className="relative">
@@ -290,24 +304,36 @@ export default function LoginPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="password-signup" className="text-slate-700 font-medium">Password</Label>
-                  <Input
-                    id="password-signup"
-                    type="password"
-                    placeholder="Min. 6 characters"
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); clearError(); }}
-                    className="min-h-[44px]"
-                    disabled={isPending}
-                    autoComplete="new-password"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password-signup"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Min. 6 characters"
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); clearError(); }}
+                      className="min-h-[44px] pr-10"
+                      disabled={isPending}
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <Button
                   type="submit"
                   disabled={isPending}
                   className="w-full min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white font-semibold"
                 >
-                  {isPending ? 'Creating account…' : 'Create Account'}
+                  {isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin inline" />Creating account…</>
+                  ) : 'Create Account'}
                 </Button>
               </form>
             )}
@@ -336,7 +362,9 @@ export default function LoginPage() {
                   disabled={isPending}
                   className="w-full min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white font-semibold"
                 >
-                  {isPending ? 'Sending…' : 'Send Magic Link'}
+                  {isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin inline" />Sending…</>
+                  ) : 'Send Magic Link'}
                 </Button>
                 <button
                   type="button"

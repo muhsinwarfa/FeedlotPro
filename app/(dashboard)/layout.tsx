@@ -36,6 +36,13 @@ export default async function DashboardLayout({
   const membership = rawMembership as MembershipRow | null;
   if (!membership) redirect('/onboarding');
 
+  // Fetch sick animal count for sidebar badge
+  const { count: sickCount } = await supabase
+    .from('animals')
+    .select('*', { count: 'exact', head: true })
+    .eq('organization_id', membership.organization_id)
+    .eq('status', 'SICK');
+
   // The WorkerSessionProvider handles the /session redirect client-side
   // (after checking localStorage TTL). The layout still renders to allow
   // the context to hydrate. Only the dashboard content is gated.
@@ -44,7 +51,7 @@ export default async function DashboardLayout({
     <WorkerSessionProvider>
       <OfflineProvider>
         <div className="flex min-h-screen bg-slate-50">
-          <Sidebar ownerRole={membership.role} />
+          <Sidebar ownerRole={membership.role} sickCount={sickCount ?? 0} />
           <div className="flex-1 min-w-0 flex flex-col">
             <OfflineBar />
             {/* Main content — add top padding on mobile for the fixed header */}

@@ -26,6 +26,7 @@ export function PenSelector({ pens, onSelect }: PenSelectorProps) {
       {pens.map((pen) => {
         const inactive = pen.status !== 'active';
         const empty = pen.active_animal_count === 0;
+        const fillPct = pen.capacity ? Math.min(100, (pen.active_animal_count / pen.capacity) * 100) : null;
 
         return (
           <button
@@ -38,7 +39,7 @@ export function PenSelector({ pens, onSelect }: PenSelectorProps) {
             }`}
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="font-semibold text-slate-900 text-sm">{pen.pen_name}</span>
+              <span className="font-semibold text-slate-900 text-lg leading-tight">{pen.pen_name}</span>
               {inactive && (
                 <span className="text-xs bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded-full flex-shrink-0">Inactive</span>
               )}
@@ -48,9 +49,17 @@ export function PenSelector({ pens, onSelect }: PenSelectorProps) {
                 {pen.active_animal_count} animals
               </span>
               {pen.capacity != null && (
-                <span className="text-xs text-slate-400">/ {pen.capacity} cap</span>
+                <span className="text-xs text-slate-400">/ {pen.capacity}</span>
               )}
             </div>
+            {fillPct !== null && (
+              <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${fillPct}%` }}
+                />
+              </div>
+            )}
           </button>
         );
       })}

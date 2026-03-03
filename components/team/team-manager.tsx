@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@/lib/supabase/client';
@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { MoreVertical } from 'lucide-react';
 import { AddWorkerForm } from '@/components/team/add-worker-form';
 import type { TenantMemberV2 } from '@/types/database';
 
@@ -67,6 +68,9 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
   const [resetPinMember, setResetPinMember] = useState<Member | null>(null);
   const [removingMember, setRemovingMember] = useState<Member | null>(null);
 
+  // Three-dot menu state
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   // Edit role state
   const [newRole, setNewRole] = useState('');
 
@@ -76,6 +80,19 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
   const [pinError, setPinError] = useState('');
 
   const supabase = createClient();
+
+  // Close three-dot menu on outside click
+  useEffect(() => {
+    if (!openMenuId) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Element;
+      if (!target.closest('[data-team-menu]')) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
 
   function refreshMembers() {
     router.refresh();
@@ -272,8 +289,8 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {member.status === 'LOCKED' ? (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {member.status === 'LOCKED' && (
                     <button
                       onClick={() => handleUnlock(member)}
                       disabled={isPending}
@@ -281,33 +298,42 @@ export function TeamManager({ members: initialMembers, organizationId, currentUs
                     >
                       Unlock
                     </button>
-                  ) : null}
+                  )}
 
-                  {/* Don't allow editing or removing the owner (identified by checking if it's the current Supabase user's record) */}
+                  {/* Three-dot menu — hidden for OWNER */}
                   {member.role !== 'OWNER' && (
-                    <>
+                    <div className="relative" data-team-menu>
                       <button
-                        onClick={() => handleEditRole(member)}
+                        onClick={() => setOpenMenuId(openMenuId === member.id ? null : member.id)}
                         disabled={isPending}
-                        className="text-xs font-medium text-slate-600 hover:text-slate-900 min-h-[44px] px-2"
+                        className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+                        aria-label="Member actions"
                       >
-                        Edit Role
+                        <MoreVertical className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleOpenResetPin(member)}
-                        disabled={isPending}
-                        className="text-xs font-medium text-slate-600 hover:text-slate-900 min-h-[44px] px-2"
-                      >
-                        Reset PIN
-                      </button>
-                      <button
-                        onClick={() => setRemovingMember(member)}
-                        disabled={isPending}
-                        className="text-xs font-medium text-red-500 hover:text-red-700 min-h-[44px] px-2"
-                      >
-                        Remove
-                      </button>
-                    </>
+                      {openMenuId === member.id && (
+                        <div className="absolute right-0 top-full mt-1 z-10 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+                          <button
+                            onClick={() => { handleEditRole(member); setOpenMenuId(null); }}
+                            className="w-full text-left px-4 text-sm text-slate-700 hover:bg-slate-50 min-h-[44px] flex items-center"
+                          >
+                            Edit Role
+                          </button>
+                          <button
+                            onClick={() => { handleOpenResetPin(member); setOpenMenuId(null); }}
+                            className="w-full text-left px-4 text-sm text-slate-700 hover:bg-slate-50 min-h-[44px] flex items-center"
+                          >
+                            Reset PIN
+                          </button>
+                          <button
+                            onClick={() => { setRemovingMember(member); setOpenMenuId(null); }}
+                            className="w-full text-left px-4 text-sm text-red-600 hover:bg-red-50 min-h-[44px] flex items-center"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

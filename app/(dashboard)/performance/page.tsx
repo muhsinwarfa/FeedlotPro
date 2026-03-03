@@ -169,6 +169,17 @@ export default async function PerformancePage() {
     };
   });
 
+  // KPI computations
+  const penAdgs = penRows.map((p) => p.avg_adg).filter((v): v is number => v !== null);
+  const farmAvgAdg = penAdgs.length > 0 ? penAdgs.reduce((s, v) => s + v, 0) / penAdgs.length : null;
+  const bestPen = penRows.reduce<{ pen_name: string; avg_adg: number } | null>((best, p) => {
+    if (p.avg_adg === null) return best;
+    if (!best || p.avg_adg > best.avg_adg) return { pen_name: p.pen_name, avg_adg: p.avg_adg };
+    return best;
+  }, null);
+  const penFcrs = penRows.map((p) => p.current_fcr).filter((v): v is number => v !== null);
+  const farmAvgFcr = penFcrs.length > 0 ? penFcrs.reduce((s, v) => s + v, 0) / penFcrs.length : null;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -179,6 +190,42 @@ export default async function PerformancePage() {
         <div>
           <h1 className="text-2xl font-bold text-emerald-950">Performance Intelligence</h1>
           <p className="text-sm text-slate-500">ADG and FCR metrics across pens and batches</p>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Farm Avg ADG</p>
+          <p className="mt-2 text-2xl font-bold font-mono text-emerald-700">
+            {farmAvgAdg != null ? `+${farmAvgAdg.toFixed(3)}` : '—'}
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">kg/day</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Best Pen</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-700 truncate">
+            {bestPen?.pen_name ?? '—'}
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {bestPen ? `${bestPen.avg_adg.toFixed(3)} kg/d ADG` : 'No data yet'}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dispatch Ready</p>
+          <p className="mt-2 text-2xl font-bold font-mono text-amber-600">{dispatchRows.length}</p>
+          <p className="text-xs text-slate-400 mt-0.5">animal{dispatchRows.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg FCR</p>
+          <p className={`mt-2 text-2xl font-bold font-mono ${
+            farmAvgFcr === null ? 'text-slate-400' :
+            farmAvgFcr <= 6 ? 'text-emerald-700' :
+            farmAvgFcr <= 8 ? 'text-amber-600' : 'text-red-600'
+          }`}>
+            {farmAvgFcr != null ? farmAvgFcr.toFixed(2) : '—'}
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">30-day rolling</p>
         </div>
       </div>
 

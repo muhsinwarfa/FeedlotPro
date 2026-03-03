@@ -109,7 +109,7 @@ export function IngredientForm({
                   placeholder="—"
                   value={values[ing.id] ?? ''}
                   onChange={(e) => handleChange(ing.id, e.target.value)}
-                  className={`min-h-[44px] font-mono text-right ${fieldErrors[ing.id] ? 'border-red-500' : ''}`}
+                  className={`min-h-[52px] text-lg font-mono text-right ${fieldErrors[ing.id] ? 'border-red-500' : ''}`}
                 />
                 <span className="text-xs text-slate-400 flex-shrink-0">kg</span>
               </div>

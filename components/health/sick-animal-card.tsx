@@ -69,8 +69,15 @@ export function SickAnimalCard({
   const canTreat = checkPermission(role, ACTION.VET_TREATMENT);
   const canResolve = checkPermission(role, ACTION.HEALTH_OUTCOME);
 
+  const cardClass =
+    severity === 'SEVERE'
+      ? 'border-red-300 bg-red-50'
+      : severity === 'MODERATE'
+      ? 'border-amber-200 bg-amber-50'
+      : 'border-slate-200 bg-white';
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-sm p-4 space-y-3">
+    <div className={`rounded-lg border shadow-sm p-4 space-y-3 ${cardClass}`}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-0.5">

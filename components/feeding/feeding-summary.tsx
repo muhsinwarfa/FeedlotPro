@@ -35,8 +35,8 @@ export function FeedingSummary({
         <p className="text-sm text-slate-500 mt-0.5">Confirm the details below before saving.</p>
       </div>
 
-      {/* Summary card */}
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
+      {/* Summary card — receipt style */}
+      <div className="rounded-xl border-2 border-dashed border-slate-300 bg-white p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pen</p>

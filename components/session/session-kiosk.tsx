@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import bcrypt from 'bcryptjs';
+import { Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useWorkerSession } from '@/contexts/worker-session-context';
 import { mapDbError } from '@/lib/errors';
@@ -198,35 +199,49 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
     return (
       <div className="space-y-8">
         <div className="text-center">
+          <p className="text-xs font-bold tracking-widest text-emerald-700 uppercase mb-3">FeedlotPro Kenya</p>
           <h1 className="text-2xl font-bold text-slate-900">Who&apos;s Working?</h1>
           <p className="mt-1 text-sm text-slate-500">Tap your name to start your session.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {members.map((member) => (
-            <button
-              key={member.id}
-              onClick={() => handleSelectMember(member)}
-              disabled={member.status === 'LOCKED'}
-              className="flex flex-col items-center gap-3 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-emerald-300 active:scale-95 transition-all min-h-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {/* Avatar circle */}
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
-                style={{ backgroundColor: member.avatar_color }}
+          {members.map((member) => {
+            const isLocked = member.status === 'LOCKED';
+            return (
+              <button
+                key={member.id}
+                onClick={() => handleSelectMember(member)}
+                disabled={isLocked}
+                className={`flex flex-col items-center gap-3 p-5 rounded-2xl border shadow-sm active:scale-95 transition-all min-h-[120px] disabled:cursor-not-allowed ${
+                  isLocked
+                    ? 'border-red-200 bg-red-50'
+                    : 'border-slate-200 bg-white hover:shadow-md hover:ring-2 hover:ring-emerald-400 hover:ring-offset-2'
+                }`}
               >
-                {getInitials(member.display_name)}
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-slate-800 leading-tight">
-                  {member.display_name}
-                </p>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {member.status === 'LOCKED' ? '🔒 Locked' : ROLE_LABELS[member.role] ?? member.role}
-                </p>
-              </div>
-            </button>
-          ))}
+                {/* Avatar circle */}
+                {isLocked ? (
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center bg-red-100 border-2 border-red-200 flex-shrink-0">
+                    <Lock className="w-6 h-6 text-red-500" />
+                  </div>
+                ) : (
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
+                    style={{ backgroundColor: member.avatar_color }}
+                  >
+                    {getInitials(member.display_name)}
+                  </div>
+                )}
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-slate-800 leading-tight">
+                    {member.display_name}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${isLocked ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
+                    {isLocked ? 'Locked' : ROLE_LABELS[member.role] ?? member.role}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     );

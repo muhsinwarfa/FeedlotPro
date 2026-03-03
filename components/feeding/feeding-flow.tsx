@@ -238,28 +238,30 @@ export function FeedingFlow({ pens, ingredients, orgId, rations = [] }: FeedingF
     <div className="space-y-6">
       {/* Step indicator (not shown on SAVED) */}
       {step !== 'SAVED' && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           {STEPS.map((s, i) => {
             const current = stepIndex[step];
             const isDone = i < current;
             const isActive = i === current;
             return (
-              <div key={s.key} className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+              <div key={s.key} className="flex items-center flex-1 last:flex-none">
+                <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
                     isDone
                       ? 'bg-amber-500 text-white'
                       : isActive
-                      ? 'bg-emerald-950 text-white'
+                      ? 'bg-emerald-700 text-white'
                       : 'bg-slate-200 text-slate-400'
                   }`}>
                     {isDone ? '✓' : i + 1}
                   </div>
-                  <span className={`text-xs hidden sm:inline font-medium ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>
+                  <span className={`text-xs font-medium whitespace-nowrap ${isActive ? 'text-slate-900' : isDone ? 'text-amber-600' : 'text-slate-400'}`}>
                     {s.label}
                   </span>
                 </div>
-                {i < STEPS.length - 1 && <div className="w-6 h-px bg-slate-200 flex-shrink-0" />}
+                {i < STEPS.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-2 mb-4 ${i < current ? 'bg-amber-400' : 'bg-slate-200'}`} />
+                )}
               </div>
             );
           })}

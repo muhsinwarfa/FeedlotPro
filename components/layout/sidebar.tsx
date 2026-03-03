@@ -107,11 +107,13 @@ function IconClose() {
 interface SidebarProps {
   /** Role from the Supabase owner membership — used as fallback before worker context hydrates */
   ownerRole?: WorkerRole;
+  /** Number of SICK animals — drives red badge on Health nav item */
+  sickCount?: number;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export function Sidebar({ ownerRole }: SidebarProps) {
+export function Sidebar({ ownerRole, sickCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -214,7 +216,12 @@ export function Sidebar({ ownerRole }: SidebarProps) {
               }`}
             >
               <item.icon />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.href === '/health' && sickCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                  {sickCount > 9 ? '9+' : sickCount}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -225,7 +232,7 @@ export function Sidebar({ ownerRole }: SidebarProps) {
         {/* Current worker chip */}
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
             style={{ backgroundColor: workerColor }}
           >
             {workerInitials}
@@ -266,13 +273,21 @@ export function Sidebar({ ownerRole }: SidebarProps) {
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-emerald-950 flex items-center justify-between px-4 py-3 shadow-md">
         <p className="text-white font-bold">FeedlotPro Kenya</p>
-        <button
-          onClick={() => setMobileOpen((prev) => !prev)}
-          className="text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Toggle menu"
-        >
-          {mobileOpen ? <IconClose /> : <IconMenu />}
-        </button>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+            style={{ backgroundColor: workerColor }}
+          >
+            {workerInitials}
+          </div>
+          <button
+            onClick={() => setMobileOpen((prev) => !prev)}
+            className="text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <IconClose /> : <IconMenu />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}

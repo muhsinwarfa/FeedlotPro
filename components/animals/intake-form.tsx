@@ -282,176 +282,83 @@ export function IntakeForm({ organizationId, pens, batches }: IntakeFormProps) {
 
   // ── Form ──────────────────────────────────────────────────────────────────
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-5 pb-24">
 
-      {/* Tag ID */}
-      <div className="space-y-1.5">
-        <Label htmlFor="tagId" className="text-slate-700 font-medium">
-          Tag ID <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="tagId"
-          type="text"
-          placeholder="e.g. KE-2024-001"
-          value={form.tagId}
-          onChange={(e) => handleChange('tagId', e.target.value)}
-          onBlur={(e) => checkTagUniqueness(e.target.value)}
-          className={`min-h-[44px] ${fieldErrors.tagId ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-          disabled={isPending}
-          autoComplete="off"
-        />
-        {fieldErrors.tagId && <p className="text-xs text-red-600">{fieldErrors.tagId}</p>}
-      </div>
+      {/* ── Section 1: Animal Identity ─────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Animal Identity</h3>
 
-      {/* Breed */}
-      <div className="space-y-1.5">
-        <Label htmlFor="breed" className="text-slate-700 font-medium">
-          Breed <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="breed"
-          type="text"
-          placeholder="e.g. Boran, Sahiwal, Fresian Cross"
-          value={form.breed}
-          onChange={(e) => handleChange('breed', e.target.value)}
-          className={`min-h-[44px] ${fieldErrors.breed ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-          disabled={isPending}
-        />
-        {fieldErrors.breed && <p className="text-xs text-red-600">{fieldErrors.breed}</p>}
-      </div>
-
-      {/* Gender + Age Category */}
-      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label htmlFor="gender" className="text-slate-700 font-medium">Gender</Label>
-          <Select value={form.gender} onValueChange={(v) => handleChange('gender', v)} disabled={isPending}>
-            <SelectTrigger id="gender" className="min-h-[44px]">
-              <SelectValue placeholder="Select…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="BULL">Bull</SelectItem>
-              <SelectItem value="HEIFER">Heifer</SelectItem>
-              <SelectItem value="STEER">Steer</SelectItem>
-              <SelectItem value="COW">Cow</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor="tagId" className="text-slate-700 font-medium">
+            Tag ID <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="tagId"
+            type="text"
+            placeholder="e.g. KE-2024-001"
+            value={form.tagId}
+            onChange={(e) => handleChange('tagId', e.target.value)}
+            onBlur={(e) => checkTagUniqueness(e.target.value)}
+            className={`min-h-[44px] ${fieldErrors.tagId ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+            disabled={isPending}
+            autoComplete="off"
+          />
+          {fieldErrors.tagId && <p className="text-xs text-red-600">{fieldErrors.tagId}</p>}
         </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="ageCategory" className="text-slate-700 font-medium">Age Category</Label>
-          <Select value={form.ageCategory} onValueChange={(v) => handleChange('ageCategory', v)} disabled={isPending}>
-            <SelectTrigger id="ageCategory" className="min-h-[44px]">
-              <SelectValue placeholder="Select…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CALF">Calf (0–6 mo)</SelectItem>
-              <SelectItem value="WEANER">Weaner (6–12 mo)</SelectItem>
-              <SelectItem value="GROWER">Grower (12–24 mo)</SelectItem>
-              <SelectItem value="FINISHER">Finisher (24 mo+)</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor="breed" className="text-slate-700 font-medium">
+            Breed <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="breed"
+            type="text"
+            placeholder="e.g. Boran, Sahiwal, Fresian Cross"
+            value={form.breed}
+            onChange={(e) => handleChange('breed', e.target.value)}
+            className={`min-h-[44px] ${fieldErrors.breed ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+            disabled={isPending}
+          />
+          {fieldErrors.breed && <p className="text-xs text-red-600">{fieldErrors.breed}</p>}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="gender" className="text-slate-700 font-medium">Gender</Label>
+            <Select value={form.gender} onValueChange={(v) => handleChange('gender', v)} disabled={isPending}>
+              <SelectTrigger id="gender" className="min-h-[44px]">
+                <SelectValue placeholder="Select…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BULL">Bull</SelectItem>
+                <SelectItem value="HEIFER">Heifer</SelectItem>
+                <SelectItem value="STEER">Steer</SelectItem>
+                <SelectItem value="COW">Cow</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ageCategory" className="text-slate-700 font-medium">Age Category</Label>
+            <Select value={form.ageCategory} onValueChange={(v) => handleChange('ageCategory', v)} disabled={isPending}>
+              <SelectTrigger id="ageCategory" className="min-h-[44px]">
+                <SelectValue placeholder="Select…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CALF">Calf (0–6 mo)</SelectItem>
+                <SelectItem value="WEANER">Weaner (6–12 mo)</SelectItem>
+                <SelectItem value="GROWER">Grower (12–24 mo)</SelectItem>
+                <SelectItem value="FINISHER">Finisher (24 mo+)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
-      {/* Pen */}
-      <div className="space-y-1.5">
-        <Label htmlFor="penId" className="text-slate-700 font-medium">
-          Pen <span className="text-red-500">*</span>
-        </Label>
-        <Select value={form.penId} onValueChange={(value) => handleChange('penId', value)} disabled={isPending}>
-          <SelectTrigger
-            id="penId"
-            className={`min-h-[44px] ${fieldErrors.penId ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-          >
-            <SelectValue placeholder="Select a pen…" />
-          </SelectTrigger>
-          <SelectContent>
-            {pens.length === 0 ? (
-              <SelectItem value="_none" disabled>No active pens found</SelectItem>
-            ) : (
-              pens.map((pen) => (
-                <SelectItem key={pen.id} value={pen.id}>
-                  {pen.pen_name}
-                  {pen.capacity != null && (
-                    <span className="ml-2 text-slate-400 text-xs">({pen.active_animal_count}/{pen.capacity})</span>
-                  )}
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-        {fieldErrors.penId && <p className="text-xs text-red-600">{fieldErrors.penId}</p>}
-      </div>
-
-      {/* Intake Weight */}
-      <div className="space-y-1.5">
-        <Label htmlFor="intakeWeight" className="text-slate-700 font-medium">
-          Intake Weight (kg) <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="intakeWeight"
-          type="number"
-          min="0.1"
-          step="0.1"
-          placeholder="0.0"
-          value={form.intakeWeight}
-          onChange={(e) => handleChange('intakeWeight', e.target.value)}
-          className={`min-h-[44px] font-mono ${fieldErrors.intakeWeight ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-          disabled={isPending}
-        />
-        {fieldErrors.intakeWeight && <p className="text-xs text-red-600">{fieldErrors.intakeWeight}</p>}
-      </div>
-
-      {/* Intake Date */}
-      <div className="space-y-1.5">
-        <Label htmlFor="intakeDate" className="text-slate-700 font-medium">
-          Intake Date <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="intakeDate"
-          type="date"
-          value={form.intakeDate}
-          onChange={(e) => handleChange('intakeDate', e.target.value)}
-          className={`min-h-[44px] ${fieldErrors.intakeDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-          disabled={isPending}
-        />
-        {fieldErrors.intakeDate && <p className="text-xs text-red-600">{fieldErrors.intakeDate}</p>}
-      </div>
-
-      {/* Batch */}
-      <div className="space-y-1.5">
-        <Label className="text-slate-700 font-medium">
-          Batch <span className="text-slate-400 font-normal">(optional)</span>
-        </Label>
-        <BatchSelector
-          organizationId={organizationId}
-          batches={batches}
-          value={form.batchId}
-          onChange={(batchId) => handleChange('batchId', batchId)}
-          disabled={isPending}
-        />
-      </div>
-
-      {/* Source Supplier */}
-      <div className="space-y-1.5">
-        <Label htmlFor="sourceSupplier" className="text-slate-700 font-medium">
-          Source / Supplier <span className="text-slate-400 font-normal">(optional)</span>
-        </Label>
-        <Input
-          id="sourceSupplier"
-          type="text"
-          placeholder="e.g. Narok Market"
-          value={form.sourceSupplier}
-          onChange={(e) => handleChange('sourceSupplier', e.target.value)}
-          className="min-h-[44px]"
-          disabled={isPending}
-        />
-      </div>
-
-      {/* Photo */}
-      <div className="space-y-1.5">
-        <Label className="text-slate-700 font-medium">
-          Animal Photo <span className="text-slate-400 font-normal">(optional, max 2 MB)</span>
-        </Label>
+      {/* ── Section 2: Photo ────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          Photo <span className="font-normal normal-case text-slate-400">(optional, max 2 MB)</span>
+        </h3>
         {photoPreview ? (
           <div className="relative rounded-lg overflow-hidden border border-slate-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -467,7 +374,7 @@ export function IntakeForm({ organizationId, pens, batches }: IntakeFormProps) {
         ) : (
           <div
             {...getRootProps()}
-            className={`rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-colors ${
+            className={`rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors ${
               isDragActive ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
             }`}
           >
@@ -479,8 +386,108 @@ export function IntakeForm({ organizationId, pens, batches }: IntakeFormProps) {
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-3 pt-2">
+      {/* ── Section 3: Location & Batch ─────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Location &amp; Batch</h3>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="penId" className="text-slate-700 font-medium">
+            Pen <span className="text-red-500">*</span>
+          </Label>
+          <Select value={form.penId} onValueChange={(value) => handleChange('penId', value)} disabled={isPending}>
+            <SelectTrigger
+              id="penId"
+              className={`min-h-[44px] ${fieldErrors.penId ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+            >
+              <SelectValue placeholder="Select a pen…" />
+            </SelectTrigger>
+            <SelectContent>
+              {pens.length === 0 ? (
+                <SelectItem value="_none" disabled>No active pens found</SelectItem>
+              ) : (
+                pens.map((pen) => (
+                  <SelectItem key={pen.id} value={pen.id}>
+                    {pen.pen_name}
+                    {pen.capacity != null && (
+                      <span className="ml-2 text-slate-400 text-xs">({pen.active_animal_count}/{pen.capacity})</span>
+                    )}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+          {fieldErrors.penId && <p className="text-xs text-red-600">{fieldErrors.penId}</p>}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-slate-700 font-medium">
+            Batch <span className="text-slate-400 font-normal">(optional)</span>
+          </Label>
+          <BatchSelector
+            organizationId={organizationId}
+            batches={batches}
+            value={form.batchId}
+            onChange={(batchId) => handleChange('batchId', batchId)}
+            disabled={isPending}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="sourceSupplier" className="text-slate-700 font-medium">
+            Source / Supplier <span className="text-slate-400 font-normal">(optional)</span>
+          </Label>
+          <Input
+            id="sourceSupplier"
+            type="text"
+            placeholder="e.g. Narok Market"
+            value={form.sourceSupplier}
+            onChange={(e) => handleChange('sourceSupplier', e.target.value)}
+            className="min-h-[44px]"
+            disabled={isPending}
+          />
+        </div>
+      </div>
+
+      {/* ── Section 4: Measurements ─────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Measurements</h3>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="intakeWeight" className="text-slate-700 font-medium">
+            Intake Weight (kg) <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="intakeWeight"
+            type="number"
+            min="0.1"
+            step="0.1"
+            placeholder="0.0"
+            value={form.intakeWeight}
+            onChange={(e) => handleChange('intakeWeight', e.target.value)}
+            className={`min-h-[44px] font-mono ${fieldErrors.intakeWeight ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+            disabled={isPending}
+          />
+          {fieldErrors.intakeWeight && <p className="text-xs text-red-600">{fieldErrors.intakeWeight}</p>}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="intakeDate" className="text-slate-700 font-medium">
+            Intake Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="intakeDate"
+            type="date"
+            value={form.intakeDate}
+            onChange={(e) => handleChange('intakeDate', e.target.value)}
+            className={`min-h-[44px] ${fieldErrors.intakeDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+            disabled={isPending}
+          />
+          {fieldErrors.intakeDate && <p className="text-xs text-red-600">{fieldErrors.intakeDate}</p>}
+        </div>
+      </div>
+
+      {/* ── Sticky Submit ────────────────────────────────────────────────── */}
+      <div className="fixed bottom-0 left-0 right-0 lg:left-60 bg-white border-t border-slate-100 px-4 py-4 flex items-center gap-3 z-20">
         <Button
           type="submit"
           disabled={isPending}

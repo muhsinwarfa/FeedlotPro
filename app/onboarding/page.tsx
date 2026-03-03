@@ -27,6 +27,7 @@ export default function OnboardingPage() {
   const [isPending, startTransition] = useTransition();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [celebrating, setCelebrating] = useState(false);
 
   // Step 1 state
   const [farmName, setFarmName] = useState('');
@@ -153,12 +154,33 @@ export default function OnboardingPage() {
         return;
       }
 
-      router.push('/inventory');
-      router.refresh();
+      setCelebrating(true);
+      setTimeout(() => {
+        router.push('/inventory');
+        router.refresh();
+      }, 1500);
     });
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (celebrating) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="text-center space-y-5 animate-in fade-in zoom-in-95 duration-500">
+          <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+            <svg className="w-10 h-10 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Your farm is ready!</h2>
+            <p className="text-slate-500 text-sm mt-1">Taking you to your dashboard…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const stepLabels = ['Farm Details', 'Pens', 'Feed Pantry'];
 
@@ -216,9 +238,15 @@ export default function OnboardingPage() {
           {/* ── Step 1 ── */}
           {step === 1 && (
             <div className="space-y-5">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">What is your farm called?</h2>
-                <p className="text-sm text-slate-500 mt-0.5">This name appears on all your records.</p>
+              <div className="text-center pb-2">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-9 h-9 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-emerald-700">Welcome to FeedlotPro Kenya</p>
+                <h2 className="text-lg font-bold text-slate-900 mt-0.5">Let&apos;s set up your farm</h2>
+                <p className="text-sm text-slate-500 mt-0.5">This takes about 2 minutes.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -311,27 +339,28 @@ export default function OnboardingPage() {
 
               {penError && <p className="text-xs text-red-600">{penError}</p>}
 
-              {/* Pen list */}
+              {/* Pen chips */}
               {pens.length > 0 && (
-                <ul className="space-y-2">
+                <div className="flex flex-wrap gap-2">
                   {pens.map((pen, i) => (
-                    <li key={i} className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                      <span className="text-sm font-medium text-slate-800">{pen.name}</span>
-                      <div className="flex items-center gap-3">
-                        {pen.capacity && (
-                          <span className="text-xs text-slate-400 font-mono">Cap: {pen.capacity}</span>
-                        )}
-                        <button
-                          onClick={() => removePen(i)}
-                          className="text-slate-400 hover:text-red-500 text-lg leading-none"
-                          aria-label="Remove pen"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </li>
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1.5 text-sm font-medium"
+                    >
+                      {pen.name}
+                      {pen.capacity && (
+                        <span className="text-emerald-600 text-xs">({pen.capacity})</span>
+                      )}
+                      <button
+                        onClick={() => removePen(i)}
+                        className="text-emerald-500 hover:text-emerald-900 ml-0.5 text-base leading-none"
+                        aria-label="Remove pen"
+                      >
+                        ×
+                      </button>
+                    </span>
                   ))}
-                </ul>
+                </div>
               )}
 
               <div className="flex gap-3 pt-2">
@@ -386,25 +415,25 @@ export default function OnboardingPage() {
 
               {ingredientError && <p className="text-xs text-red-600">{ingredientError}</p>}
 
-              {/* Ingredient list */}
+              {/* Ingredient chips */}
               {ingredients.length > 0 && (
-                <ul className="space-y-2">
+                <div className="flex flex-wrap gap-2">
                   {ingredients.map((ing, i) => (
-                    <li key={i} className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                      <span className="text-sm font-medium text-slate-800">{ing.name}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-400">kg</span>
-                        <button
-                          onClick={() => removeIngredient(i)}
-                          className="text-slate-400 hover:text-red-500 text-lg leading-none"
-                          aria-label="Remove ingredient"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </li>
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1.5 text-sm font-medium"
+                    >
+                      {ing.name}
+                      <button
+                        onClick={() => removeIngredient(i)}
+                        className="text-emerald-500 hover:text-emerald-900 ml-0.5 text-base leading-none"
+                        aria-label="Remove ingredient"
+                      >
+                        ×
+                      </button>
+                    </span>
                   ))}
-                </ul>
+                </div>
               )}
 
               <div className="flex gap-3 pt-2">

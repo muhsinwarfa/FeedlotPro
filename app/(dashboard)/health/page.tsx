@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Database } from '@/types/database';
 import { SickAnimalCard } from '@/components/health/sick-animal-card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { HeartPulse } from 'lucide-react';
 
 export const metadata = { title: 'Animal Health — FeedlotPro' };
@@ -114,6 +115,11 @@ export default async function HealthPage() {
 
   const role = (membership.role ?? 'FARMHAND') as import('@/lib/worker-session').WorkerRole;
 
+  // Severity counts for stats bar
+  const severeCnt = sorted.filter((a) => healthEventsByAnimal[a.id]?.severity === 'SEVERE').length;
+  const moderateCnt = sorted.filter((a) => healthEventsByAnimal[a.id]?.severity === 'MODERATE').length;
+  const mildCnt = sorted.filter((a) => healthEventsByAnimal[a.id]?.severity === 'MILD').length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -139,13 +145,43 @@ export default async function HealthPage() {
         )}
       </div>
 
+      {/* Severity stats bar */}
+      {sorted.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
+          {severeCnt > 0 && (
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+              <span className="font-semibold text-red-700">{severeCnt}</span>
+              <span className="text-slate-500">Severe</span>
+            </div>
+          )}
+          {moderateCnt > 0 && (
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
+              <span className="font-semibold text-amber-700">{moderateCnt}</span>
+              <span className="text-slate-500">Moderate</span>
+            </div>
+          )}
+          {mildCnt > 0 && (
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400 flex-shrink-0" />
+              <span className="font-semibold text-slate-600">{mildCnt}</span>
+              <span className="text-slate-500">Mild</span>
+            </div>
+          )}
+          {severeCnt === 0 && moderateCnt === 0 && mildCnt === 0 && (
+            <span className="text-sm text-slate-400">No severity data recorded</span>
+          )}
+        </div>
+      )}
+
       {/* Sick animal list */}
       {sorted.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
-          <HeartPulse className="mx-auto h-10 w-10 text-slate-300 mb-3" />
-          <p className="text-slate-500 font-medium">No sick animals</p>
-          <p className="text-sm text-slate-400">Animals flagged as sick will appear here.</p>
-        </div>
+        <EmptyState
+          icon={<HeartPulse className="w-8 h-8 text-slate-400" />}
+          title="All animals are healthy!"
+          description="Animals flagged as sick will appear here."
+        />
       ) : (
         <div className="grid gap-4">
           {sorted.map((animal) => {

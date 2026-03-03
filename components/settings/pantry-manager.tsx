@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { PurchaseDialog } from './purchase-dialog';
 
 type Ingredient = {
@@ -36,6 +37,9 @@ export function PantryManager({
   const [ingredientName, setIngredientName] = useState('');
   const [ingredientError, setIngredientError] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  // Expandable row state
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Inline price editing state
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
@@ -250,143 +254,118 @@ export function PantryManager({
         </form>
       )}
 
-      {/* Ingredient list */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+      {/* Ingredient list — expandable accordion rows */}
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden divide-y divide-slate-100">
         {ingredients.length === 0 ? (
           <p className="py-8 text-center text-slate-400 text-sm">No ingredients yet. Add one above.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Ingredient
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Unit
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Price (KES/kg)
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Stock (kg)
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {ingredients.map((ing) => {
-                const isEditingPrice = editingPriceId === ing.id;
-                return (
-                  <tr key={ing.id}>
-                    {/* Name */}
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {ing.ingredient_name}
-                    </td>
+          ingredients.map((ing) => {
+            const isExpanded = expandedId === ing.id;
+            const isEditingPrice = editingPriceId === ing.id;
+            const stockColor =
+              ing.current_stock > 100
+                ? 'bg-emerald-100 text-emerald-700'
+                : ing.current_stock >= 20
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-red-100 text-red-700';
 
-                    {/* Unit */}
-                    <td className="px-4 py-3 text-center font-mono text-slate-500">
-                      {ing.unit}
-                    </td>
+            return (
+              <div key={ing.id}>
+                {/* Collapsed header row */}
+                <button
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                  onClick={() => setExpandedId(isExpanded ? null : ing.id)}
+                >
+                  <span className="font-medium text-slate-900 text-sm">{ing.ingredient_name}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold font-mono ${stockColor}`}>
+                      {ing.current_stock.toFixed(1)} kg
+                    </span>
+                    {isExpanded
+                      ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                      : <ChevronDown className="w-4 h-4 text-slate-400" />
+                    }
+                  </div>
+                </button>
 
-                    {/* Price — inline editable for OWNER/MANAGER */}
-                    <td className="px-4 py-3 text-right">
-                      {isEditingPrice ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={priceInput}
-                            onChange={(e) => {
-                              setPriceInput(e.target.value);
-                              setPriceError('');
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitPriceEdit(ing.id);
-                              if (e.key === 'Escape') cancelEditingPrice();
-                            }}
-                            className={`w-24 min-h-[36px] text-right font-mono text-sm ${
-                              priceError ? 'border-red-500' : ''
-                            }`}
-                            autoFocus
-                          />
+                {/* Expanded detail panel */}
+                {isExpanded && (
+                  <div className="px-4 pb-4 space-y-3 bg-slate-50 border-t border-slate-100">
+                    {/* Price edit */}
+                    {canManagePricing && (
+                      <div className="pt-3">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                          Price (KES/kg)
+                        </p>
+                        {isEditingPrice ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={priceInput}
+                              onChange={(e) => { setPriceInput(e.target.value); setPriceError(''); }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') commitPriceEdit(ing.id);
+                                if (e.key === 'Escape') cancelEditingPrice();
+                              }}
+                              className={`w-28 min-h-[40px] text-right font-mono text-sm ${priceError ? 'border-red-500' : ''}`}
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => commitPriceEdit(ing.id)}
+                              disabled={isPending}
+                              className="text-sm text-emerald-700 hover:text-emerald-900 font-semibold disabled:opacity-50 min-h-[44px] px-2"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={cancelEditingPrice}
+                              className="text-sm text-slate-400 hover:text-slate-600 min-h-[44px] px-2"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => commitPriceEdit(ing.id)}
-                            disabled={isPending}
-                            className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold disabled:opacity-50"
+                            onClick={() => startEditingPrice(ing)}
+                            className="font-mono text-sm text-slate-900 hover:text-emerald-700 underline decoration-dashed underline-offset-2 min-h-[44px]"
                           >
-                            Save
-                          </button>
-                          <button
-                            onClick={cancelEditingPrice}
-                            className="text-xs text-slate-400 hover:text-slate-600"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => (canManagePricing ? startEditingPrice(ing) : undefined)}
-                          className={`font-mono text-sm ${
-                            canManagePricing
-                              ? 'hover:text-emerald-700 cursor-pointer underline decoration-dashed underline-offset-2'
-                              : 'cursor-default'
-                          } ${
-                            ing.current_price_per_kg == null ? 'text-slate-400' : 'text-slate-900'
-                          }`}
-                          title={canManagePricing ? 'Click to edit price' : undefined}
-                        >
-                          {ing.current_price_per_kg != null
-                            ? ing.current_price_per_kg.toFixed(2)
-                            : '— KES/kg'}
-                        </button>
-                      )}
-                      {isEditingPrice && priceError && (
-                        <p className="text-xs text-red-600 mt-0.5 text-right">{priceError}</p>
-                      )}
-                    </td>
-
-                    {/* Stock level with colour coding */}
-                    <td className="px-4 py-3 text-right">
-                      <span
-                        className={`font-mono text-sm font-semibold ${
-                          ing.current_stock <= 0
-                            ? 'text-red-600'
-                            : ing.current_stock < 50
-                            ? 'text-amber-600'
-                            : 'text-emerald-700'
-                        }`}
-                      >
-                        {ing.current_stock.toFixed(1)}
-                      </span>
-                    </td>
-
-                    {/* Row actions */}
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        {canManagePricing && (
-                          <button
-                            onClick={() => openPurchaseForIngredient(ing.id)}
-                            disabled={isPending}
-                            className="text-xs text-emerald-700 hover:text-emerald-900 font-medium disabled:opacity-50"
-                          >
-                            + Stock
+                            {ing.current_price_per_kg != null
+                              ? `KES ${ing.current_price_per_kg.toFixed(2)}/kg`
+                              : 'Set price…'}
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDelete(ing)}
-                          disabled={isPending}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
-                        >
-                          Remove
-                        </button>
+                        {isEditingPrice && priceError && (
+                          <p className="text-xs text-red-600 mt-0.5">{priceError}</p>
+                        )}
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-3 pt-1">
+                      {canManagePricing && (
+                        <button
+                          onClick={() => openPurchaseForIngredient(ing.id)}
+                          disabled={isPending}
+                          className="text-sm text-emerald-700 hover:text-emerald-900 font-medium disabled:opacity-50 min-h-[44px] px-2"
+                        >
+                          + Record Purchase
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(ing)}
+                        disabled={isPending}
+                        className="text-sm text-red-600 hover:text-red-800 font-medium disabled:opacity-50 min-h-[44px] px-2"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 

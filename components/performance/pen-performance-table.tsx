@@ -3,6 +3,7 @@
 // ─── Pen Performance Table — P7 Performance Intelligence ─────────────────────
 // Sortable table of pen-level ADG and FCR metrics.
 // FCR color coding: ≤6 green, 6–8 amber, >8 red.
+// Block 9: Added recharts horizontal ADG bar chart + FCR legend.
 
 import { useState } from 'react';
 import {
@@ -14,6 +15,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 interface PenRow {
   id: string;
@@ -112,38 +122,80 @@ export function PenPerformanceTable({ pens, batches }: Props) {
 
       {/* Pens tab */}
       {tab === 'pens' && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <ColHeader label="Pen" sortable="pen_name" />
-              <ColHeader label="Animals" sortable="active_animal_count" />
-              <ColHeader label="Avg ADG (kg/d)" sortable="avg_adg" />
-              <ColHeader label="FCR (30d)" sortable="current_fcr" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedPens.length === 0 ? (
+        <>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-slate-400 py-8">
-                  No pens with data yet.
-                </TableCell>
+                <ColHeader label="Pen" sortable="pen_name" />
+                <ColHeader label="Animals" sortable="active_animal_count" />
+                <ColHeader label="Avg ADG (kg/d)" sortable="avg_adg" />
+                <ColHeader label="FCR (30d)" sortable="current_fcr" />
               </TableRow>
-            ) : (
-              sortedPens.map((pen) => (
-                <TableRow key={pen.id} className="hover:bg-slate-50">
-                  <TableCell className="font-medium">{pen.pen_name}</TableCell>
-                  <TableCell>{pen.active_animal_count}</TableCell>
-                  <TableCell className="font-mono">
-                    {pen.avg_adg != null ? pen.avg_adg.toFixed(3) : <span className="text-slate-400">—</span>}
-                  </TableCell>
-                  <TableCell className={`font-mono ${fcrColor(pen.current_fcr)}`}>
-                    {pen.current_fcr != null ? pen.current_fcr.toFixed(2) : <span className="text-slate-400">—</span>}
+            </TableHeader>
+            <TableBody>
+              {sortedPens.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-slate-400 py-8">
+                    No pens with data yet.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                sortedPens.map((pen) => (
+                  <TableRow key={pen.id} className="hover:bg-slate-50">
+                    <TableCell className="font-medium">{pen.pen_name}</TableCell>
+                    <TableCell>{pen.active_animal_count}</TableCell>
+                    <TableCell className="font-mono">
+                      {pen.avg_adg != null ? pen.avg_adg.toFixed(3) : <span className="text-slate-400">—</span>}
+                    </TableCell>
+                    <TableCell className={`font-mono ${fcrColor(pen.current_fcr)}`}>
+                      {pen.current_fcr != null ? pen.current_fcr.toFixed(2) : <span className="text-slate-400">—</span>}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+
+          {/* ADG bar chart */}
+          {sortedPens.some((p) => p.avg_adg !== null) && (
+            <div className="border-t border-slate-100 p-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">ADG by Pen (kg/day)</p>
+              <ResponsiveContainer width="100%" height={Math.max(120, sortedPens.length * 36)}>
+                <BarChart
+                  data={sortedPens.filter((p) => p.avg_adg !== null).map((p) => ({ name: p.pen_name, adg: parseFloat(p.avg_adg!.toFixed(3)) }))}
+                  layout="vertical"
+                  margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+                >
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}`} />
+                  <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: number | undefined) => [`${v ?? 0} kg/d`, 'ADG']} />
+                  <Bar dataKey="adg" radius={[0, 4, 4, 0]}>
+                    {sortedPens.filter((p) => p.avg_adg !== null).map((_, i) => (
+                      <Cell key={i} fill="#059669" />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* FCR legend */}
+          <div className="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider w-full">FCR Guide</p>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="text-slate-600">≤ 6 — Excellent</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+              <span className="text-slate-600">6–8 — Average</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+              <span className="text-slate-600">&gt; 8 — Poor</span>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Batches tab */}
