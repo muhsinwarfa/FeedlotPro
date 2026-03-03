@@ -60,7 +60,16 @@ export function mapDbError(error: DbError): ToastPayload {
     };
   }
 
-  // DAT-003: duplicate tag ID (generic 23505 catch-all for animals)
+  // tenant_members unique violation (e.g. duplicate display_name or user_id)
+  // Must be checked BEFORE the generic 23505 catch-all below.
+  if (error.code === '23505' && error.message?.includes('tenant_members')) {
+    return {
+      title: 'Error',
+      description: 'A team member with these details already exists.',
+    };
+  }
+
+  // DAT-003: duplicate tag ID — scoped to animals table unique constraint
   if (
     error.code === '23505' ||
     error.message?.includes('animals_tag_id_org_unique') ||

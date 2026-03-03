@@ -79,10 +79,11 @@ export function AddWorkerForm({ organizationId, onSuccess }: AddWorkerFormProps)
 
       const { error } = await supabase.from('tenant_members').insert({
         organization_id: organizationId,
-        // user_id is not applicable for non-Supabase-auth workers — use a placeholder UUID
-        // that won't conflict with Supabase auth users. The device's owner Supabase session
-        // provides the tenancy context.
-        user_id: '00000000-0000-0000-0000-000000000000',
+        // user_id is NULL for non-Supabase-auth workers (farmhands, vets, managers).
+        // The owner's real auth UUID is stored via complete_onboarding. A partial
+        // unique index (WHERE user_id IS NOT NULL) keeps auth-user uniqueness intact
+        // while allowing multiple NULL rows for PIN-only workers.
+        user_id: null,
         role: form.role,
         display_name: form.displayName.trim(),
         avatar_color: form.avatarColor,
