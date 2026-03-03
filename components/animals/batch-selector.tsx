@@ -39,6 +39,8 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  // Local copy so newly created batches appear immediately without a page refresh
+  const [localBatches, setLocalBatches] = useState(batches);
 
   const [newBatch, setNewBatch] = useState({
     batchCode: `BATCH-${today()}`,
@@ -80,13 +82,14 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
         return;
       }
 
+      setLocalBatches((prev) => [...prev, data]);
       toast({ title: 'Batch Created', description: `Batch "${data.batch_code}" is ready.` });
       setShowCreateForm(false);
       onChange(data.id);
     });
   }
 
-  const selectedBatch = batches.find((b) => b.id === value);
+  const selectedBatch = localBatches.find((b) => b.id === value);
 
   return (
     <div className="space-y-3">
@@ -103,7 +106,7 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {batches.map((batch) => (
+          {localBatches.map((batch) => (
             <SelectItem key={batch.id} value={batch.id}>
               {batch.batch_code}
               <span className="ml-2 text-slate-400 text-xs">{batch.arrival_date}</span>
