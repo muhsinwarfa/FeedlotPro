@@ -89,8 +89,6 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
     });
   }
 
-  const selectedBatch = localBatches.find((b) => b.id === value);
-
   return (
     <div className="space-y-3">
       <Select
@@ -99,15 +97,18 @@ export function BatchSelector({ organizationId, batches, value, onChange, disabl
         disabled={disabled || isPending}
       >
         <SelectTrigger className="min-h-[44px]">
-          <SelectValue placeholder="Select or create a batch…">
-            {selectedBatch
-              ? `${selectedBatch.batch_code} (${selectedBatch.arrival_date})`
-              : undefined}
-          </SelectValue>
+          {/* No custom children — Radix uses textValue from the selected SelectItem.
+              Custom children on SelectValue cause a removeChild DOM crash in React 18
+              when selectedBatch transitions from undefined → object after batch creation. */}
+          <SelectValue placeholder="Select or create a batch…" />
         </SelectTrigger>
         <SelectContent>
           {localBatches.map((batch) => (
-            <SelectItem key={batch.id} value={batch.id}>
+            <SelectItem
+              key={batch.id}
+              value={batch.id}
+              textValue={`${batch.batch_code} (${batch.arrival_date})`}
+            >
               {batch.batch_code}
               <span className="ml-2 text-slate-400 text-xs">{batch.arrival_date}</span>
               {batch.source_supplier && (
