@@ -305,6 +305,7 @@ export function SessionKiosk({ members, organizationId, sessionTtlHours }: Sessi
         </div>
 
         <PinPad
+          key={setupPin ? 'confirm' : 'setup'}
           onComplete={setupPin ? handlePinSetupStep2 : handlePinSetupStep1}
           isPending={isPending}
         />
