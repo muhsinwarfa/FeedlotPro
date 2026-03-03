@@ -16,14 +16,16 @@ export default async function SessionPage() {
 
   if (!user) redirect('/login');
 
-  // Get the org and session TTL
-  const { data: rawMembership } = await supabase
+  // Use limit(1) + array access — .single() returns null when duplicate
+  // tenant_member rows exist for the same user_id (e.g. after repeated
+  // onboarding submissions during the RLS incident), causing a redirect loop.
+  const { data: membershipRows } = await supabase
     .from('tenant_members')
     .select('organization_id')
     .eq('user_id', user.id)
-    .single();
+    .limit(1);
 
-  const membership = rawMembership as { organization_id: string } | null;
+  const membership = (membershipRows?.[0] ?? null) as { organization_id: string } | null;
   if (!membership) redirect('/onboarding');
 
   const orgId = membership.organization_id;
