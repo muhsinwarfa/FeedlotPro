@@ -32,12 +32,17 @@ export function ExportControls({ reportTitle, dateRange, exportData }: ExportCon
     setShowDropdown(false);
     setIsExporting(true);
     try {
-      const XLSX = (await import('xlsx')).default;
+      const xlsxModule = await import('xlsx');
+      const XLSX = xlsxModule.default ?? xlsxModule;
       const wb = XLSX.utils.book_new();
       for (const sheet of exportData) {
         if (sheet.rows.length === 0) continue;
         const ws = XLSX.utils.json_to_sheet(sheet.rows);
         XLSX.utils.book_append_sheet(wb, ws, sheet.sheetName.slice(0, 31));
+      }
+      if (wb.SheetNames.length === 0) {
+        console.warn('Excel export: no data in selected date range');
+        return;
       }
       const fileName = `${reportTitle.replace(/\s+/g, '-')}-${dateRange}.xlsx`;
       XLSX.writeFile(wb, fileName);
