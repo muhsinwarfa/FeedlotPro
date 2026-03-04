@@ -121,7 +121,7 @@ export default async function HealthPage() {
   const mildCnt = sorted.filter((a) => healthEventsByAnimal[a.id]?.severity === 'MILD').length;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
