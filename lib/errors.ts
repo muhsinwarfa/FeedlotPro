@@ -29,7 +29,10 @@ interface DbError {
  *  - ERR_INVALID_PIN / DAT-005 → DAT-005
  */
 export function mapDbError(error: DbError): ToastPayload {
-  if (error.message?.includes('ERR_INVALID_TRANSITION')) {
+  if (
+    error.message?.includes('ERR_INVALID_TRANSITION') ||
+    error.message?.includes('BUS-001')
+  ) {
     return {
       title: 'BUS-001',
       description: 'Error: Record Locked (Animal Dead/Dispatched)',

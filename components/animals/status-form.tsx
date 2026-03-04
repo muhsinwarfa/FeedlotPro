@@ -86,9 +86,14 @@ export function StatusForm({ animal, pens }: StatusFormProps) {
     if (!confirmStatus) return;
 
     startTransition(async () => {
+      const now = new Date().toISOString();
+      const updatePayload: Record<string, unknown> = { status: confirmStatus, updated_at: now };
+      if (confirmStatus === 'DEAD')       updatePayload.mortality_date = now.split('T')[0];
+      if (confirmStatus === 'DISPATCHED') updatePayload.dispatch_date  = now.split('T')[0];
+
       const { error } = await supabase
         .from('animals')
-        .update({ status: confirmStatus } as never)
+        .update(updatePayload as never)
         .eq('id', animal.id);
 
       if (error) {

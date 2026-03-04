@@ -81,45 +81,22 @@ export function HealthOutcomeForm({ animalId, organizationId, memberId, role, on
 
   function executeOutcome() {
     startTransition(async () => {
-      const now = new Date().toISOString();
-      let animalUpdate: Record<string, unknown> = { updated_at: now };
+      // Map outcome → health_event event_type.
+      // trg_health_event_to_animal (AFTER INSERT) auto-propagates animals.status,
+      // sick_since, mortality_date, dispatch_date — no separate animals UPDATE needed.
+      // ORDER IS CRITICAL: health_event INSERT must come first — if animals.status were
+      // already DEAD/DISPATCHED, trg_animal_immutability_health (BEFORE INSERT) would
+      // raise BUS-001 and block the insert.
       let eventType: string;
-
       switch (outcome) {
-        case 'RECOVERED':
-          animalUpdate = { ...animalUpdate, status: 'ACTIVE', sick_since: null };
-          eventType = 'RECOVERED';
-          break;
-        case 'STILL_SICK':
-          eventType = 'FOLLOW_UP_SCHEDULED';
-          break;
-        case 'DEAD':
-          animalUpdate = { ...animalUpdate, status: 'DEAD' };
-          eventType = 'MORTALITY';
-          break;
-        case 'DISPATCHED_EARLY':
-          animalUpdate = { ...animalUpdate, status: 'DISPATCHED' };
-          eventType = 'DISPATCHED_EARLY';
-          break;
-        default:
-          return;
+        case 'RECOVERED':        eventType = 'RECOVERED';           break;
+        case 'STILL_SICK':       eventType = 'FOLLOW_UP_SCHEDULED'; break;
+        case 'DEAD':             eventType = 'MORTALITY';            break;
+        case 'DISPATCHED_EARLY': eventType = 'DISPATCHED_EARLY';    break;
+        default: return;
       }
 
-      // Update animal (only for outcomes that change status)
-      if (Object.keys(animalUpdate).length > 1) {
-        const { error } = await supabase
-          .from('animals')
-          .update(animalUpdate)
-          .eq('id', animalId);
-
-        if (error) {
-          toast({ variant: 'destructive', ...mapDbError(error) });
-          return;
-        }
-      }
-
-      // Insert health event
-      await supabase.from('health_events').insert({
+      const { error: eventError } = await supabase.from('health_events').insert({
         animal_id: animalId,
         organization_id: organizationId,
         event_type: eventType,
@@ -130,6 +107,11 @@ export function HealthOutcomeForm({ animalId, organizationId, memberId, role, on
         photo_url: null,
         performed_by: memberId,
       });
+
+      if (eventError) {
+        toast({ variant: 'destructive', ...mapDbError(eventError) });
+        return;
+      }
 
       const outcomeLabel = OUTCOMES.find((o) => o.value === outcome)?.label ?? outcome;
       toast({ title: 'Outcome recorded', description: `Status updated: ${outcomeLabel}.` });
