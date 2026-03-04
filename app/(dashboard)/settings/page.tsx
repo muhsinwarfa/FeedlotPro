@@ -6,6 +6,7 @@ import { PenManager } from '@/components/settings/pen-manager';
 import { PantryManager } from '@/components/settings/pantry-manager';
 import { RationManager } from '@/components/settings/ration-manager';
 import { type RationWithIngredients } from '@/components/settings/ration-form-dialog';
+import { FarmSettingsForm } from '@/components/settings/farm-settings-form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const metadata = {
@@ -42,7 +43,7 @@ export default async function SettingsPage() {
   // Fetch org name, pens, pantry ingredients, and ration templates in parallel
   const [{ data: rawOrg }, { data: rawPens }, { data: rawIngredients }, { data: rawRations }] =
     await Promise.all([
-      supabase.from('organizations').select('farm_name').eq('id', orgId).single(),
+      supabase.from('organizations').select('farm_name, target_weight').eq('id', orgId).single(),
       supabase
         .from('pens')
         .select('id, pen_name, status, capacity, active_animal_count')
@@ -80,7 +81,9 @@ export default async function SettingsPage() {
     current_stock: number;
   };
 
-  const farmName = (rawOrg as { farm_name: string } | null)?.farm_name ?? 'Your Farm';
+  const rawOrgTyped = rawOrg as { farm_name: string; target_weight: number | null } | null;
+  const farmName = rawOrgTyped?.farm_name ?? 'Your Farm';
+  const targetWeight = rawOrgTyped?.target_weight ?? null;
   const pens = (rawPens ?? []) as Pen[];
   const ingredients = (rawIngredients ?? []) as Ingredient[];
   const rations = (rawRations ?? []) as unknown as RationWithIngredients[];
@@ -98,7 +101,11 @@ export default async function SettingsPage() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        {isOwner && (
+          <FarmSettingsForm orgId={orgId} initialTargetWeight={targetWeight} />
+        )}
+
         <Tabs defaultValue="pens">
           <TabsList className="mb-6">
             <TabsTrigger value="pens">Pens</TabsTrigger>
