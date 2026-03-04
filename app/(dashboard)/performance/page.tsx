@@ -181,7 +181,7 @@ export default async function PerformancePage() {
   const farmAvgFcr = penFcrs.length > 0 ? penFcrs.reduce((s, v) => s + v, 0) / penFcrs.length : null;
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100">
