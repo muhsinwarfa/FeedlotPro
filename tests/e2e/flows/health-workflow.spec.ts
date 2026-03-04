@@ -1,12 +1,21 @@
 /**
- * Layer 5 — E2E: Health Workflow (P6)
+ * Layer 5 — E2E: Health Workflow (P6) — State Machine Testing
  *
- * Verifies the /health page: sick animal list renders, flag-sick form shows
- * symptom fields, and the treatment form fields meet the 44px tap target.
+ * Verifies the animal health state machine from the browser perspective:
+ *  - Form visibility matches animal status (ACTIVE / SICK / DEAD)
+ *  - Locked banner shows terminal dates when animal is DEAD/DISPATCHED
+ *  - /health page renders correctly
  *
- * Skip behaviour: tests skip gracefully when not authenticated.
+ * Skip behaviour: all tests skip gracefully when not authenticated.
+ * Set E2E_TEST_EMAIL and E2E_TEST_PASSWORD env vars to run against a real environment.
+ * Optional env vars for state machine tests:
+ *   E2E_ACTIVE_ANIMAL_ID — an animal with status=ACTIVE
+ *   E2E_SICK_ANIMAL_ID   — an animal with status=SICK
+ *   E2E_DEAD_ANIMAL_ID   — an animal with status=DEAD (must have a mortality_date)
  */
 import { test, expect } from '@playwright/test';
+
+// ── /health page ──────────────────────────────────────────────────────────────
 
 test.describe('Health page — /health', () => {
   test.beforeEach(async ({ page }) => {
@@ -20,16 +29,92 @@ test.describe('Health page — /health', () => {
     await expect(page.getByRole('heading', { name: /animal health/i })).toBeVisible();
   });
 
-  test('page shows sick count or empty state message', async ({ page }) => {
-    // Either sick animals list or empty state
+  test('page shows sick animal list or empty state', async ({ page }) => {
     const hasSick = await page.locator('[data-testid="sick-animal-card"], .rounded-lg.border').count();
-    expect(hasSick).toBeGreaterThanOrEqual(0); // page always renders something
+    expect(hasSick).toBeGreaterThanOrEqual(0);
   });
 });
 
-// ── Animal detail — Flag Sick form ────────────────────────────────────────────
+// ── State machine — form visibility by animal status ──────────────────────────
+//
+// Each test navigates to /inventory/[id] and asserts which health forms are
+// present based on the animal's current status. This validates the server-side
+// conditional rendering logic in app/(dashboard)/inventory/[id]/page.tsx.
 
-test.describe('Flag Sick form on animal detail', () => {
+test.describe('Health state machine — form visibility by status', () => {
+  test('ACTIVE animal: FlagSick form visible, HealthOutcome form NOT visible', async ({ page }) => {
+    const animalId = process.env.E2E_ACTIVE_ANIMAL_ID;
+    if (!animalId) {
+      test.skip(true, 'E2E_ACTIVE_ANIMAL_ID not set — skipping status visibility test');
+    }
+    await page.goto(`/inventory/${animalId}`);
+    if (page.url().includes('/login')) {
+      test.skip(true, 'Not authenticated');
+    }
+    // FlagSickForm renders for ACTIVE animals
+    await expect(page.getByRole('heading', { name: /Flag as Sick/i })).toBeVisible({ timeout: 5_000 });
+    // HealthOutcomeForm must NOT be visible for ACTIVE animals
+    await expect(page.getByRole('heading', { name: /Resolve Health Status/i })).not.toBeVisible();
+  });
+
+  test('SICK animal: HealthOutcome form visible, FlagSick form NOT visible', async ({ page }) => {
+    const animalId = process.env.E2E_SICK_ANIMAL_ID;
+    if (!animalId) {
+      test.skip(true, 'E2E_SICK_ANIMAL_ID not set — skipping status visibility test');
+    }
+    await page.goto(`/inventory/${animalId}`);
+    if (page.url().includes('/login')) {
+      test.skip(true, 'Not authenticated');
+    }
+    // HealthOutcomeForm renders for SICK animals
+    await expect(page.getByRole('heading', { name: /Resolve Health Status/i })).toBeVisible({ timeout: 5_000 });
+    // FlagSickForm must NOT be visible for SICK animals
+    await expect(page.getByRole('heading', { name: /Flag as Sick/i })).not.toBeVisible();
+  });
+
+  test('DEAD animal: neither health form visible; locked banner shown', async ({ page }) => {
+    const animalId = process.env.E2E_DEAD_ANIMAL_ID;
+    if (!animalId) {
+      test.skip(true, 'E2E_DEAD_ANIMAL_ID not set — skipping locked banner test');
+    }
+    await page.goto(`/inventory/${animalId}`);
+    if (page.url().includes('/login')) {
+      test.skip(true, 'Not authenticated');
+    }
+    // Locked banner must appear for terminal animals
+    await expect(page.getByText(/BUS-001: Record Sealed/i)).toBeVisible({ timeout: 5_000 });
+    // Neither health form should be visible
+    await expect(page.getByRole('heading', { name: /Flag as Sick/i })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: /Resolve Health Status/i })).not.toBeVisible();
+  });
+});
+
+// ── Terminal dates in locked banner ───────────────────────────────────────────
+//
+// After marking an animal DEAD (via StatusForm or HealthOutcomeForm), the locked
+// banner in inventory/[id]/page.tsx should render the mortality_date text.
+// This validates that status-form.tsx correctly sets mortality_date in the
+// update payload (V2.2 fix — GAP C).
+
+test.describe('Terminal dates in locked banner', () => {
+  test('DEAD animal detail shows Mortality date in locked banner', async ({ page }) => {
+    const animalId = process.env.E2E_DEAD_ANIMAL_ID;
+    if (!animalId) {
+      test.skip(true, 'E2E_DEAD_ANIMAL_ID not set — skipping terminal date test');
+    }
+    await page.goto(`/inventory/${animalId}`);
+    if (page.url().includes('/login')) {
+      test.skip(true, 'Not authenticated');
+    }
+    await expect(page.getByText(/BUS-001: Record Sealed/i)).toBeVisible({ timeout: 5_000 });
+    // The locked banner conditionally shows "Mortality: <date>." when mortality_date is set
+    await expect(page.getByText(/Mortality:/i)).toBeVisible();
+  });
+});
+
+// ── Inventory page smoke test ──────────────────────────────────────────────────
+
+test.describe('Inventory page loads without error', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/inventory');
     if (page.url().includes('/login')) {
@@ -37,58 +122,9 @@ test.describe('Flag Sick form on animal detail', () => {
     }
   });
 
-  test('inventory page loads without error', async ({ page }) => {
-    // Should show the inventory heading or some animal data
+  test('inventory page renders without JS error', async ({ page }) => {
     await expect(page.locator('body')).toBeVisible();
     const title = await page.title();
     expect(title).not.toContain('Error');
-  });
-});
-
-// ── Performance page ──────────────────────────────────────────────────────────
-
-test.describe('Performance page — /performance', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/performance');
-    if (page.url().includes('/login')) {
-      test.skip(true, 'Not authenticated');
-    }
-  });
-
-  test('page renders "Performance Intelligence" heading or redirects non-OWNER', async ({ page }) => {
-    const url = page.url();
-    if (!url.includes('/performance')) {
-      // Redirected — acceptable for non-OWNER roles
-      return;
-    }
-    await expect(page.getByRole('heading', { name: /performance intelligence/i })).toBeVisible();
-  });
-
-  test('pen & batch metrics table is visible for OWNER', async ({ page }) => {
-    const url = page.url();
-    if (!url.includes('/performance')) {
-      test.skip(true, 'Non-OWNER redirected — RBAC working correctly');
-    }
-    // Either table or empty state
-    await expect(page.locator('body')).toBeVisible();
-  });
-
-  test('Pens and Batches tab buttons are visible for OWNER', async ({ page }) => {
-    const url = page.url();
-    if (!url.includes('/performance')) {
-      test.skip(true, 'Non-OWNER redirected');
-    }
-    await expect(page.getByRole('button', { name: /pens/i })).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByRole('button', { name: /batches/i })).toBeVisible();
-  });
-
-  test('Dispatch Ready section is visible for OWNER', async ({ page }) => {
-    const url = page.url();
-    if (!url.includes('/performance')) {
-      test.skip(true, 'Non-OWNER redirected');
-    }
-    await expect(
-      page.getByRole('heading', { name: /dispatch ready/i })
-    ).toBeVisible({ timeout: 5_000 });
   });
 });

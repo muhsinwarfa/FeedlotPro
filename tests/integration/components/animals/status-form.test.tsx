@@ -54,11 +54,12 @@ describe('StatusForm', () => {
   });
 
   describe('ACTIVE animal transitions', () => {
-    it('renders "Mark Sick", "Mark Dead", "Mark Dispatched" buttons', () => {
+    // V2: ACTIVE→SICK is handled by FlagSickForm. StatusForm only covers terminal transitions.
+    it('renders "Mark Dead" and "Mark Dispatched" buttons (no Mark Sick — handled by FlagSickForm)', () => {
       render(<StatusForm animal={activeAnimal} pens={mockPens} />);
-      expect(screen.getByRole('button', { name: /Mark Sick/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Mark Dead/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Mark Dispatched/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Mark Sick/i })).not.toBeInTheDocument();
     });
 
     it('does NOT render "Mark Active" button (no self-loop from ACTIVE)', () => {
@@ -78,31 +79,23 @@ describe('StatusForm', () => {
   });
 
   describe('SICK animal transitions', () => {
-    it('renders "Mark Active (Recovered)" button for SICK animal', () => {
+    // V2: SICK→ACTIVE (recovery) is handled by HealthOutcomeForm.
+    // StatusForm for SICK animals only offers terminal transitions: DEAD or DISPATCHED.
+    it('renders "Mark Dead" and "Mark Dispatched" buttons for SICK animal', () => {
       render(<StatusForm animal={sickAnimal} pens={mockPens} />);
-      expect(screen.getByRole('button', { name: /Mark Active/i })).toBeInTheDocument();
-    });
-  });
-
-  describe('SICK transition flow (inline panel, not dialog)', () => {
-    it('clicking "Mark Sick" shows inline amber-50 panel', () => {
-      render(<StatusForm animal={activeAnimal} pens={mockPens} />);
-      fireEvent.click(screen.getByRole('button', { name: /Mark Sick/i }));
-      expect(screen.getByText(/Moving to sick pen/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Mark Dead/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Mark Dispatched/i })).toBeInTheDocument();
     });
 
-    it('shows "Select Sick Pen" label in inline panel', () => {
-      render(<StatusForm animal={activeAnimal} pens={mockPens} />);
-      fireEvent.click(screen.getByRole('button', { name: /Mark Sick/i }));
-      expect(screen.getByText('Select Sick Pen')).toBeInTheDocument();
+    it('does NOT render "Mark Active" button for SICK animal (HealthOutcomeForm handles recovery)', () => {
+      render(<StatusForm animal={sickAnimal} pens={mockPens} />);
+      expect(screen.queryByRole('button', { name: /Mark Active/i })).not.toBeInTheDocument();
     });
 
-    it('clicking Cancel clears the inline confirmation panel', () => {
-      render(<StatusForm animal={activeAnimal} pens={mockPens} />);
-      fireEvent.click(screen.getByRole('button', { name: /Mark Sick/i }));
-      expect(screen.getByText(/Moving to sick pen/i)).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /Cancel/i }));
-      expect(screen.queryByText(/Moving to sick pen/i)).not.toBeInTheDocument();
+    it('clicking "Mark Dead" on SICK animal opens Dialog', () => {
+      render(<StatusForm animal={sickAnimal} pens={mockPens} />);
+      fireEvent.click(screen.getByRole('button', { name: /Mark Dead/i }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
   });
 
@@ -159,6 +152,56 @@ describe('StatusForm', () => {
         expect(mockToast).toHaveBeenCalledWith(
           expect.objectContaining({ title: 'BUS-001', variant: 'destructive' })
         );
+      });
+    });
+
+    it('shows BUS-001 toast for V2.2 trigger format "BUS-001: ..."', async () => {
+      mockUpdate.mockReturnValue({
+        eq: vi.fn(() => Promise.resolve({
+          error: { message: 'BUS-001: Animal is DEAD — modifications are locked.', code: 'P0001' },
+        })),
+      });
+      render(<StatusForm animal={activeAnimal} pens={mockPens} />);
+      fireEvent.click(screen.getByRole('button', { name: /Mark Dead/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Yes, Record as Dead/i }));
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'BUS-001', variant: 'destructive' })
+        );
+      });
+    });
+  });
+
+  describe('DB update payload — terminal dates', () => {
+    it('includes mortality_date (YYYY-MM-DD) in update payload when marking DEAD', async () => {
+      let capturedPayload: unknown;
+      mockUpdate.mockImplementation((payload: unknown) => {
+        capturedPayload = payload;
+        return { eq: vi.fn(() => Promise.resolve({ error: null })) };
+      });
+      render(<StatusForm animal={activeAnimal} pens={mockPens} />);
+      fireEvent.click(screen.getByRole('button', { name: /Mark Dead/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Yes, Record as Dead/i }));
+      await waitFor(() => expect(mockRouterRefresh).toHaveBeenCalled());
+      expect(capturedPayload).toMatchObject({
+        status: 'DEAD',
+        mortality_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      });
+    });
+
+    it('includes dispatch_date (YYYY-MM-DD) in update payload when marking DISPATCHED', async () => {
+      let capturedPayload: unknown;
+      mockUpdate.mockImplementation((payload: unknown) => {
+        capturedPayload = payload;
+        return { eq: vi.fn(() => Promise.resolve({ error: null })) };
+      });
+      render(<StatusForm animal={activeAnimal} pens={mockPens} />);
+      fireEvent.click(screen.getByRole('button', { name: /Mark Dispatched/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Yes, Dispatch Animal/i }));
+      await waitFor(() => expect(mockRouterRefresh).toHaveBeenCalled());
+      expect(capturedPayload).toMatchObject({
+        status: 'DISPATCHED',
+        dispatch_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       });
     });
   });

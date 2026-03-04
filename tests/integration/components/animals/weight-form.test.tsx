@@ -145,6 +145,24 @@ describe('WeightForm', () => {
         );
       });
     });
+
+    it('shows BUS-001 toast for V2.2 trigger format "BUS-001: ..."', async () => {
+      const user = userEvent.setup();
+      mockInsert.mockResolvedValue({
+        error: {
+          message: 'BUS-001: Animal KE-2024-001 is DEAD — modifications are locked.',
+          code: 'P0001',
+        },
+      });
+      render(<WeightForm animalId="animal-1" animalStatus="ACTIVE" />);
+      await user.type(screen.getByLabelText(/New Weight/i), '310');
+      fireEvent.click(screen.getByRole('button', { name: /Record Weight/i }));
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'BUS-001', variant: 'destructive' })
+        );
+      });
+    });
   });
 
   describe('pending state', () => {

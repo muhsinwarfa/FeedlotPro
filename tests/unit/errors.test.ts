@@ -123,6 +123,22 @@ describe('mapDbError', () => {
     });
   });
 
+  describe('V2.2 trigger format (ERRCODE=P0001)', () => {
+    it('returns BUS-001 when message starts with "BUS-001:" (V2.2 trigger format)', () => {
+      const result = mapDbError({
+        message: 'BUS-001: Animal KE-2024-001 (animal-uuid) is DEAD — modifications are locked.',
+        code: 'P0001',
+      });
+      expect(result.title).toBe('BUS-001');
+      expect(result.description).toMatch(/Dead|Dispatched/i);
+    });
+
+    it('"BUS-001" prefix takes precedence over 23505 when both present', () => {
+      const result = mapDbError({ code: '23505', message: 'BUS-001: locked' });
+      expect(result.title).toBe('BUS-001');
+    });
+  });
+
   describe('priority ordering', () => {
     it('ERR_INVALID_TRANSITION takes precedence over 23505 code when both present', () => {
       const result = mapDbError({ code: '23505', message: 'ERR_INVALID_TRANSITION and animals_tag_id_org_unique' });
