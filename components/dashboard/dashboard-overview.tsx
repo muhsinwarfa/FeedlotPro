@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useWorkerSession } from '@/contexts/worker-session-context';
 import { AlertTriangle } from 'lucide-react';
 
 type Props = {
@@ -13,18 +12,7 @@ type Props = {
   farmName: string;
 };
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
 export function DashboardOverview({ activeAnimals, sickAnimals, totalPens, fedToday, avgAdg, farmName }: Props) {
-  const { activeSession } = useWorkerSession();
-  const workerName = activeSession?.displayName ?? 'there';
-  const greeting = getGreeting();
-
   const stats = [
     {
       label: 'Active Animals',
@@ -150,12 +138,6 @@ export function DashboardOverview({ activeAnimals, sickAnimals, totalPens, fedTo
 
   return (
     <div className="space-y-8">
-      {/* Greeting */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-900">{greeting}, {workerName}!</h2>
-        <p className="text-sm text-slate-500 mt-0.5">{farmName} · {new Date().toLocaleDateString('en-KE', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-      </div>
-
       {/* Health alert banner */}
       {sickAnimals > 0 && (
         <Link
